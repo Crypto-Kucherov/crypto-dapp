@@ -12,4 +12,4 @@ It calculates user scores based on GitHub activity, social presence and on-chain
 `node src/index.js` or `node scripts/updateScores.js`
 
 ## Author
-Built by @yourname — Web3 explorer
+Built by @Pashus07 — Web3 explorer
