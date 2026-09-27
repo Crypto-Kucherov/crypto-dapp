@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-09-27T14:03:24.715Z",
+  "profile": {
+    "login": "Crypto-Kucherov",
+    "name": "Crypto-Kucherov",
+    "url": "https://github.com/Crypto-Kucherov",
+    "bio": "I’m an active crypto degen, investor, and influencer — absolutely love Ethereum.",
+    "createdAt": "2023-07-12T12:18:11Z",
+    "publicRepositories": 2,
+    "followers": 0,
+    "following": 4
+  },
+  "scope": {
+    "publicOnly": true,
+    "since": "2025-01-01T00:00:00.000Z",
+    "until": "2026-09-27T14:03:24.715Z",
+    "repositoryListComplete": true,
+    "listedRepositories": 2,
+    "inspectedRepositories": 1,
+    "maxRepos": 10,
+    "apiRequests": 8
+  },
+  "activity": {
+    "pullRequests": {
+      "count": 1,
+      "complete": true,
+      "warning": null
+    },
+    "issues": {
+      "count": 0,
+      "complete": true,
+      "warning": null
+    },
+    "externalMergedPullRequests": {
+      "count": 0,
+      "complete": true,
+      "warning": null
+    }
+  },
+  "repositories": [
+    {
+      "name": "crypto-dapp",
+      "url": "https://github.com/Crypto-Kucherov/crypto-dapp",
+      "description": "Public GitHub activity and repository reports with Markdown/JSON exports. Node.js, zero dependencies.",
+      "fork": false,
+      "archived": false,
+      "defaultBranch": "main",
+      "language": "JavaScript",
+      "pushedAt": "2026-09-27T14:02:47Z",
+      "stars": 0,
+      "inspected": true,
+      "checks": {
+        "readme": true,
+        "license": true,
+        "tests": true,
+        "ci": true,
+        "sourceFiles": 7,
+        "sourceFilesComplete": true
+      },
+      "commits": {
+        "count": 5,
+        "complete": true
+      },
+      "release": {
+        "status": "present",
+        "tag": "v0.1.0",
+        "url": "https://github.com/Crypto-Kucherov/crypto-dapp/releases/tag/v0.1.0"
+      },
+      "warnings": []
+    },
+    {
+      "name": "jscamp",
+      "url": "https://github.com/Crypto-Kucherov/jscamp",
+      "description": "Contenido y ejercicios del JSCamp InfoJobs",
+      "fork": true,
+      "archived": false,
+      "language": null,
+      "stars": 0,
+      "pushedAt": "2025-10-04T10:47:56Z",
+      "inspected": false,
+      "skipReason": "fork"
+    }
+  ],
+  "warnings": [],
+  "limitations": [
+    "This is a public GitHub report. It does not calculate or predict Legion Score, allocation eligibility or investment returns.",
+    "Commit counts cover attributed commits on inspected repositories’ current default branches in the selected time window; they are not the GitHub contribution calendar.",
+    "Forks and archived repositories are listed but not inspected. Repository push dates may reflect other contributors’ work.",
+    "PR and issue searches cover public records only. External means outside repositories owned by this account, not an endorsement or a quality measure.",
+    "File checks are path heuristics. A detected test or CI file does not establish that it runs or passes; a missing path may use a different convention.",
+    "A release means the latest published, non-draft, non-prerelease GitHub release. Unknown checks and incomplete counts must not be treated as zero."
+  ],
+  "recommendations": [
+    "Contribute a useful fix, test or example to a project you use; no merged public PRs outside your repositories were found in this window."
+  ]
+}
