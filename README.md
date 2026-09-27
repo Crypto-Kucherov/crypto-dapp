@@ -4,7 +4,7 @@ A small, dependency-free CLI that turns a public GitHub profile into a readable
 activity and repository report. Built for people who want to understand what
 their public developer portfolio actually demonstrates.
 
-[Русская инструкция](docs/README.ru.md) · [Example report](examples/crypto-kucherov.md) · [MIT license](LICENSE)
+[Русская инструкция](docs/README.ru.md) · [Example report](examples/crypto-kucherov.md) · [Example comparison](examples/comparison.md) · [MIT license](LICENSE)
 
 **This tool reports observable GitHub data. It does not calculate or predict
 Legion Score, token-sale allocations, or investment returns.** There is no
@@ -31,6 +31,60 @@ node src/index.js Crypto-Kucherov --since 2026-01-01 --max-repos 5
 
 Use a new output filename for each snapshot. Existing files are never overwritten.
 Without `--out`, the report goes to stdout; diagnostics go to stderr.
+
+## Compare saved snapshots
+
+Comparison works entirely offline and needs no token. Pass the older JSON report
+first and the newer one second:
+
+```sh
+node src/index.js --compare reports/before.json reports/after.json
+node src/index.js --compare reports/before.json reports/after.json --format json --out reports/changes.json
+```
+
+Try the included, dated snapshots immediately after cloning:
+
+```sh
+node src/index.js --compare examples/crypto-kucherov.json examples/crypto-kucherov-after.json
+```
+
+These examples capture the public profile before and after the first release on
+27 September 2026. They are historical snapshots, not current statistics.
+[See the rendered comparison](examples/comparison.md).
+
+The comparison shows public repository and PR/issue totals, repository visibility,
+attributed commits, detected source files, README/license/test/CI paths, and stable
+release tags. Unknown evidence stays unknown. Repositories omitted from incomplete
+pages or excluded by a different inspection limit are not treated as deleted or broken.
+
+For activity deltas, use the same `--since` date when collecting both reports:
+
+```sh
+node src/index.js Crypto-Kucherov --since 2026-01-01 --format json --out reports/before.json
+# After making useful changes, save a later snapshot with the same start date:
+node src/index.js Crypto-Kucherov --since 2026-01-01 --format json --out reports/after.json
+node src/index.js --compare reports/before.json reports/after.json
+```
+
+| Condition | Comparison behavior |
+| --- | --- |
+| Same activity window | Show net differences for complete counts |
+| Same start, later end | Show net differences with an expanded-window warning |
+| Different starts, or an earlier end | Show both activity totals but suppress activity deltas |
+| Unknown/incomplete counts | Show evidence without inventing a numeric delta |
+| Different default branch | Suppress that repository’s commit delta |
+| Different accounts, reversed snapshots, unsupported schema, malformed data | Exit with an error |
+
+An expanded-window delta is not a count of newly authored work: indexing, history
+rewrites or changed visibility may also affect totals. Current file/release
+evidence can still be compared when activity windows differ. Check file paths
+remain heuristics, not test or CI results. Neither report mode estimates Legion Score.
+
+Comparison accepts only `--format` and `--out`; collection flags cannot change
+the contents of saved snapshots. Use exported profile JSON with `schemaVersion: 1`,
+including existing v0.1 reports. Comparison JSON has `kind: "comparison"` and cannot
+itself be used as an input profile snapshot. Interpretation warnings go to stderr
+and are included in the output; successful comparisons return exit code 0.
 
 ## What it reports
 
@@ -101,8 +155,8 @@ Markdown escaping, and snapshot output. GitHub Actions runs them on Node 22 and 
 
 The JSON output has `schemaVersion: 1`, a generation timestamp, a bounded activity
 window, coverage metadata, repository findings, recommendations and limitations.
-Use those fields when comparing snapshots. Equal windows and coverage are needed
-for meaningful comparisons; raw counter differences alone do not establish progress.
+Use `--compare` to inspect snapshot changes with coverage and time-window checks.
+Raw counter differences alone do not establish progress.
 
 ## Contributing
 

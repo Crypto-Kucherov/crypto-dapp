@@ -1,26 +1,30 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GitHubClient, validateUsername } from './github.js';
 import { analyzeProfile } from './analyze.js';
 import { renderMarkdown } from './report.js';
+import { compareSnapshots, renderComparison } from './compare.js';
 
 const HELP = `GitHub Activity Report
 
 Usage: node src/index.js USERNAME [options]
+       node src/index.js --compare BEFORE.json AFTER.json [--format markdown|json] [--out PATH]
 
 Options:
   --format markdown|json   Output format (default: markdown)
   --out PATH              Save to a new file instead of stdout
   --since YYYY-MM-DD       Activity start date, UTC (default: 90 days ago)
   --max-repos N           Inspect 1–50 active original repos (default: 10)
+  --compare BEFORE AFTER Compare two saved JSON snapshots offline (no token needed)
   --help                  Show this help
 
 Examples:
   node src/index.js Crypto-Kucherov
   node src/index.js Crypto-Kucherov --format json --out reports/profile.json
   node src/index.js Crypto-Kucherov --since 2026-01-01 --max-repos 5
+  node src/index.js --compare reports/before.json reports/after.json
 
 Optional: GITHUB_TOKEN for a higher GitHub API rate limit.
 Reads public data only. Does not calculate or predict Legion Score.
@@ -29,15 +33,24 @@ Reads public data only. Does not calculate or predict Legion Score.
 export function parseArgs(args) {
   if (args.includes('--help') || args.includes('-h')) return { help: true };
   const options = { format: 'markdown', maxRepos: 10 };
+  if (args[0] === '--compare') {
+    if (!args[1] || !args[2] || args[1].startsWith('--') || args[2].startsWith('--')) {
+      throw new Error('--compare requires two JSON snapshot paths: BEFORE AFTER.');
+    }
+    options.compare = args.slice(1, 3);
+    args = args.slice(3);
+  }
   const seen = new Set();
   for (let index = 0; index < args.length; index++) {
     const arg = args[index];
     if (!arg.startsWith('-')) {
+      if (options.compare) throw new Error('Comparison accepts exactly two snapshot paths and no username.');
       if (options.username) throw new Error('Provide exactly one GitHub username.');
       options.username = validateUsername(arg);
       continue;
     }
     if (!['--format', '--out', '--since', '--max-repos'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
+    if (options.compare && ['--since', '--max-repos'].includes(arg)) throw new Error(`${arg} cannot change the coverage of saved snapshots.`);
     if (seen.has(arg)) throw new Error(`Duplicate option: ${arg}`);
     seen.add(arg);
     const value = args[++index];
@@ -50,7 +63,7 @@ export function parseArgs(args) {
       options.maxRepos = Number(value);
     }
   }
-  if (!options.username) throw new Error('A GitHub username is required. Use --help for examples.');
+  if (!options.compare && !options.username) throw new Error('A GitHub username is required. Use --help for examples.');
   if (!['markdown', 'json'].includes(options.format)) throw new Error('--format must be markdown or json.');
   if (options.maxRepos < 1 || options.maxRepos > 50) throw new Error('--max-repos must be an integer from 1 to 50.');
   return options;
@@ -62,9 +75,21 @@ export async function main(args = process.argv.slice(2), {
   try {
     const options = parseArgs(args);
     if (options.help) { stdout.write(HELP); return 0; }
-    const github = client || new GitHubClient({ token: process.env.GITHUB_TOKEN || '' });
-    const report = await analyzeProfile(github, options.username, options);
-    const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n` : renderMarkdown(report);
+    let report;
+    if (options.compare) {
+      const snapshots = [];
+      for (const [index, path] of options.compare.entries()) {
+        const text = await readFile(path, 'utf8');
+        try { snapshots.push(JSON.parse(text)); }
+        catch { throw new Error(`${index === 0 ? 'Before' : 'After'} snapshot is not valid JSON.`); }
+      }
+      report = compareSnapshots(...snapshots);
+    } else {
+      const github = client || new GitHubClient({ token: process.env.GITHUB_TOKEN || '' });
+      report = await analyzeProfile(github, options.username, options);
+    }
+    const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n`
+      : options.compare ? renderComparison(report) : renderMarkdown(report);
     if (options.out) {
       const target = resolve(options.out);
       await mkdir(dirname(target), { recursive: true });
@@ -72,8 +97,9 @@ export async function main(args = process.argv.slice(2), {
       await writeFile(target, output, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
       stderr.write(`Saved ${options.format} report to ${target}\n`);
     } else stdout.write(output);
-    if (report.warnings.length || report.repositories.some(repo => repo.warnings?.length)) {
-      stderr.write('Some checks are incomplete. Read the coverage warnings in the report.\n');
+    if (report.warnings.length || report.repositories?.some(repo => repo.warnings?.length)) {
+      stderr.write(options.compare ? 'Read the comparison warnings before interpreting changes.\n'
+        : 'Some checks are incomplete. Read the coverage warnings in the report.\n');
     }
     return 0;
   } catch (error) {

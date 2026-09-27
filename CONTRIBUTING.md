@@ -15,7 +15,7 @@ formula, artificial commit generation, or token-sale promises.
 
 ## Possible next improvements
 
-- Compare two report snapshots while warning about different time windows or coverage.
+- Add representative snapshot-comparison cases for GitHub history or visibility changes.
 - Document additional test-file conventions with representative fixtures.
 - Add opt-in caching that preserves fetch timestamps and incomplete-data indicators.
 

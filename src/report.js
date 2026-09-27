@@ -5,7 +5,7 @@ export function escapeMarkdown(value) {
     .replace(/[\\`*_{}\[\]()#!|~]/g, '\\$&');
 }
 
-function link(label, url) {
+export function link(label, url) {
   try {
     const parsed = new URL(url);
     if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || parsed.username || parsed.password) {
