@@ -1,0 +1,144 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { GitHubClient } from '../src/github.js';
+import { analyzeProfile, inspectTree, parseSince } from '../src/analyze.js';
+import { renderMarkdown } from '../src/report.js';
+
+const NOW = new Date('2026-09-27T12:00:00.000Z');
+const repository = (name, extra = {}) => ({ name, private: false, fork: false, archived: false,
+  html_url: `https://github.com/alice/${name}`, description: null, default_branch: 'main',
+  language: 'JavaScript', pushed_at: '2026-09-20T00:00:00Z', stargazers_count: 0, ...extra });
+const tree = (paths, truncated = false) => ({ tree: paths.map(path => ({ path, type: 'blob' })), truncated });
+
+function fixtureClient({ repos = [repository('tool')], override } = {}) {
+  const seen = [];
+  const client = new GitHubClient({ fetchImpl: async (url, options) => {
+    seen.push(url);
+    const overridden = await override?.(url, options);
+    if (overridden) return overridden;
+    if (url.pathname === '/users/alice') return Response.json({ login: 'alice', type: 'User', name: 'Alice',
+      bio: 'Builds tools', created_at: '2023-07-12T12:00:00Z', public_repos: repos.filter(repo => !repo.private).length,
+      html_url: 'https://github.com/alice', followers: 2, following: 3 });
+    if (url.pathname === '/users/alice/repos') return Response.json(repos);
+    if (url.pathname === '/search/issues') return Response.json({ total_count: 0, incomplete_results: false, items: [] });
+    if (url.pathname.includes('/git/trees/')) return Response.json(tree(['README.md', 'LICENSE', 'src/index.js', 'test/index.test.js', '.github/workflows/ci.yml']));
+    if (url.pathname.endsWith('/commits')) return Response.json([{ sha: 'abc' }]);
+    if (url.pathname.endsWith('/releases/latest')) return new Response('', { status: 404 });
+    throw new Error(`Unexpected fixture request: ${url.pathname}`);
+  } });
+  return { client, seen };
+}
+
+test('calendar validation rejects rollover dates and future dates', () => {
+  assert.equal(parseSince('2024-02-29', NOW), '2024-02-29T00:00:00.000Z');
+  assert.equal(parseSince(undefined, NOW), '2026-06-29T12:00:00.000Z');
+  for (const value of ['2026-02-29', '2026-02-30', '2026-13-01', '2026-09-28', 'yesterday', '2026-9-2']) assert.throws(() => parseSince(value, NOW));
+});
+
+test('tree checks skip vendored code and distinguish truncated absence', () => {
+  const found = inspectTree(tree(['README.rst', 'COPYING', 'src/main.py', 'tests/test_main.py', '.github/workflows/test.yaml', 'vendor/sdk.js']));
+  assert.equal(found.readme, true);
+  assert.equal(found.license, true);
+  assert.equal(found.tests, true);
+  assert.equal(found.ci, true);
+  assert.equal(found.sourceFiles, 2);
+  const empty = inspectTree(tree(['README.md', 'node_modules/pkg/index.js', 'vendor/tests/test_x.py']));
+  assert.equal(empty.sourceFiles, 0);
+  assert.equal(empty.tests, false);
+  const partial = inspectTree(tree(['README.md'], true));
+  assert.equal(partial.readme, true);
+  assert.equal(partial.tests, null);
+  assert.equal(partial.sourceFilesComplete, false);
+  assert.equal(inspectTree(null).readme, null);
+});
+
+test('supports Go, colocated JS tests and Python test files', () => {
+  for (const path of ['pkg/main_test.go', 'src/index.test.mjs', 'src/button.spec.tsx', 'test_parser.py']) assert.equal(inspectTree(tree([path])).tests, true, path);
+});
+
+test('analyzes public originals, excludes private repos, and separates forks and archived repos', async () => {
+  const { client, seen } = fixtureClient({ repos: [repository('tool'), repository('copy', { fork: true }),
+    repository('old', { archived: true }), repository('private-work', { private: true }), repository('second')] });
+  const report = await analyzeProfile(client, 'alice', { now: NOW, since: '2026-01-01', maxRepos: 1 });
+  assert.equal(report.scope.listedRepositories, 4);
+  assert.equal(report.scope.inspectedRepositories, 1);
+  assert.deepEqual(report.repositories.map(repo => repo.name), ['tool', 'copy', 'old', 'second']);
+  assert.equal(report.repositories[0].commits.count, 1);
+  assert.equal(report.repositories[0].checks.tests, true);
+  assert.equal(report.repositories[0].release.status, 'absent');
+  assert.equal(report.repositories[1].skipReason, 'fork');
+  assert.equal(report.repositories[2].skipReason, 'archived');
+  assert.equal(report.repositories[3].skipReason, 'inspection limit');
+  assert.ok(!seen.some(url => /copy|old|private-work|second/.test(url.pathname)));
+  const commits = seen.find(url => url.pathname.endsWith('/commits'));
+  assert.equal(commits.searchParams.get('author'), 'alice');
+  assert.equal(commits.searchParams.get('sha'), 'main');
+  assert.equal(commits.searchParams.get('since'), '2026-01-01T00:00:00.000Z');
+  assert.equal(commits.searchParams.get('until'), NOW.toISOString());
+  const searches = seen.filter(url => url.pathname === '/search/issues').map(url => url.searchParams.get('q'));
+  assert.ok(searches.every(query => query.includes('is:public')));
+  assert.ok(searches.some(query => query.includes('-user:alice') && query.includes('merged:')));
+  assert.ok(report.warnings.some(warning => warning.includes('most recently pushed')));
+});
+
+test('unavailable activity stays unknown and produces no missing-PR advice', async () => {
+  const { client } = fixtureClient({ override: url => {
+    if (url.pathname === '/search/issues' || url.pathname.endsWith('/commits')) return new Response('', { status: 503 });
+  } });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.activity.pullRequests.count, null);
+  assert.equal(report.repositories[0].commits.count, null);
+  assert.ok(!report.recommendations.some(tip => tip.includes('no merged public PRs')));
+  assert.match(renderMarkdown(report), /Unknown/);
+  assert.match(renderMarkdown(report), /Coverage warnings/);
+});
+
+test('a truncated tree does not produce false missing-file advice', async () => {
+  const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/') ? Response.json(tree(['README.md'], true)) : undefined });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.repositories[0].checks.tests, null);
+  assert.ok(!report.recommendations.some(tip => /working implementation|add tests|choose an appropriate license/.test(tip)));
+  assert.match(report.repositories[0].warnings[0], /truncated/);
+});
+
+test('empty history is zero, inaccessible files stay unknown', async () => {
+  const { client } = fixtureClient({ override: url => {
+    if (url.pathname.endsWith('/commits') || url.pathname.includes('/git/trees/')) return new Response('', { status: 409 });
+  } });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.deepEqual(report.repositories[0].commits, { count: 0, complete: true });
+  assert.equal(report.repositories[0].checks.readme, null);
+});
+
+test('incomplete search counts are labelled and do not trigger zero-activity advice', async () => {
+  const { client } = fixtureClient({ override: url => url.pathname === '/search/issues'
+    ? Response.json({ total_count: 0, incomplete_results: true, items: [] }) : undefined });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.activity.externalMergedPullRequests.complete, false);
+  assert.match(renderMarkdown(report), /0 \(incomplete\)/);
+  assert.ok(!report.recommendations.some(tip => tip.includes('no merged public PRs')));
+});
+
+test('a user without public repos gets a useful report', async () => {
+  const { client } = fixtureClient({ repos: [] });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.scope.inspectedRepositories, 0);
+  assert.match(report.recommendations[0], /one useful original/);
+  assert.match(renderMarkdown(report), /No public repositories listed/);
+});
+
+test('rejects organizations rather than presenting them as people', async () => {
+  const { client } = fixtureClient({ override: url => url.pathname === '/users/alice' ? Response.json({ type: 'Organization' }) : undefined });
+  await assert.rejects(analyzeProfile(client, 'alice', { now: NOW }), /personal GitHub accounts/);
+});
+
+test('escapes Markdown and rejects dangerous report links', async () => {
+  const { client } = fixtureClient();
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  report.repositories[0].name = 'repo|<script>\n![track](https://evil.example/image)';
+  report.repositories[0].url = 'javascript:alert(1)';
+  report.recommendations = ['<img src=x onerror=alert(1)>\n# forged heading'];
+  const markdown = renderMarkdown(report);
+  for (const unexpected of ['<script>', '<img', 'javascript:', '\n# forged heading']) assert.ok(!markdown.includes(unexpected));
+  assert.ok(markdown.includes('repo\\|&lt;script&gt;'));
+});
