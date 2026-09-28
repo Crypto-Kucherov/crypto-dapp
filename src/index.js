@@ -6,14 +6,15 @@ import { GitHubClient, validateUsername } from './github.js';
 import { analyzeProfile } from './analyze.js';
 import { renderMarkdown } from './report.js';
 import { compareSnapshots, renderComparison } from './compare.js';
+import { renderHtml } from './html.js';
 
 const HELP = `GitHub Activity Report
 
 Usage: node src/index.js USERNAME [options]
-       node src/index.js --compare BEFORE.json AFTER.json [--format markdown|json] [--out PATH]
+       node src/index.js --compare BEFORE.json AFTER.json [--format markdown|json|html] [--out PATH]
 
 Options:
-  --format markdown|json   Output format (default: markdown)
+  --format markdown|json|html  Output format (default: markdown)
   --out PATH              Save to a new file instead of stdout
   --since YYYY-MM-DD       Activity start date, UTC (default: 90 days ago)
   --max-repos N           Inspect 1–50 active original repos (default: 10)
@@ -23,6 +24,7 @@ Options:
 Examples:
   node src/index.js Crypto-Kucherov
   node src/index.js Crypto-Kucherov --format json --out reports/profile.json
+  node src/index.js Crypto-Kucherov --format html --out reports/profile.html
   node src/index.js Crypto-Kucherov --since 2026-01-01 --max-repos 5
   node src/index.js --compare reports/before.json reports/after.json
 
@@ -64,7 +66,7 @@ export function parseArgs(args) {
     }
   }
   if (!options.compare && !options.username) throw new Error('A GitHub username is required. Use --help for examples.');
-  if (!['markdown', 'json'].includes(options.format)) throw new Error('--format must be markdown or json.');
+  if (!['markdown', 'json', 'html'].includes(options.format)) throw new Error('--format must be markdown, json or html.');
   if (options.maxRepos < 1 || options.maxRepos > 50) throw new Error('--max-repos must be an integer from 1 to 50.');
   return options;
 }
@@ -89,6 +91,7 @@ export async function main(args = process.argv.slice(2), {
       report = await analyzeProfile(github, options.username, options);
     }
     const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n`
+      : options.format === 'html' ? renderHtml(report)
       : options.compare ? renderComparison(report) : renderMarkdown(report);
     if (options.out) {
       const target = resolve(options.out);

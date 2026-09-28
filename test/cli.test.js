@@ -48,6 +48,15 @@ test('JSON output is machine-readable without stdout progress text', async () =>
   assert.equal(captured.stderr, '');
 });
 
+test('profile collection supports standalone HTML on stdout', async () => {
+  const { options, captured } = outputs();
+  assert.equal(await main(['alice', '--format', 'html'], options), 0);
+  assert.ok(captured.stdout.startsWith('<!doctype html>'));
+  assert.match(captured.stdout, /Public profile snapshot/);
+  assert.match(captured.stdout, /No public repositories listed/);
+  assert.equal(captured.stderr, '');
+});
+
 test('writes a new snapshot and refuses to overwrite it', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'github-report-test-'));
   try {
