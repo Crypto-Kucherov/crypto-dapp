@@ -21,16 +21,35 @@ cd crypto-dapp
 node src/index.js Crypto-Kucherov
 ```
 
-Save a snapshot in either format:
+Save a report in Markdown, JSON or HTML:
 
 ```sh
 node src/index.js Crypto-Kucherov --out reports/profile.md
 node src/index.js Crypto-Kucherov --format json --out reports/profile.json
+node src/index.js Crypto-Kucherov --format html --out reports/profile.html
 node src/index.js Crypto-Kucherov --since 2026-01-01 --max-repos 5
 ```
 
 Use a new output filename for each snapshot. Existing files are never overwritten.
 Without `--out`, the report goes to stdout; diagnostics go to stderr.
+
+## Open a report in your browser
+
+Use `--format html --out reports/profile.html`, then open that file in your browser.
+The responsive report includes dated metrics, repository evidence, coverage warnings
+and interpretation notes. It can be shared as one file or printed using the browser.
+Once saved, it needs no network connection: styling is embedded, with no scripts,
+remote fonts, images or other assets. GitHub links open only when you follow them.
+Collecting a fresh profile still requires GitHub API access.
+
+The HTML is a static view, not a live dashboard. Keep JSON snapshots for future
+comparisons; HTML files cannot be used as comparison inputs. Text from GitHub is
+escaped, links are restricted to HTTPS GitHub URLs, and an embedded content
+security policy blocks scripts and remote assets.
+
+Download [the example profile HTML](examples/profile.html) or
+[the example comparison HTML](examples/comparison.html) and open it locally.
+These examples use the saved public data from 27 September 2026.
 
 ## Compare saved snapshots
 
@@ -40,12 +59,14 @@ first and the newer one second:
 ```sh
 node src/index.js --compare reports/before.json reports/after.json
 node src/index.js --compare reports/before.json reports/after.json --format json --out reports/changes.json
+node src/index.js --compare reports/before.json reports/after.json --format html --out reports/changes.html
 ```
 
 Try the included, dated snapshots immediately after cloning:
 
 ```sh
 node src/index.js --compare examples/crypto-kucherov.json examples/crypto-kucherov-after.json
+node src/index.js --compare examples/crypto-kucherov.json examples/crypto-kucherov-after.json --format html --out reports/example.html
 ```
 
 These examples capture the public profile before and after the first release on
@@ -151,7 +172,8 @@ node src/index.js --help
 
 Tests use mocked GitHub responses and require no network or credentials. They
 cover pagination, rate limits, partial data, attribution scope, input validation,
-Markdown escaping, and snapshot output. GitHub Actions runs them on Node 22 and 24.
+Markdown/HTML escaping, safe links, standalone HTML and snapshot output. GitHub
+Actions runs them on Node 22 and 24.
 
 The JSON output has `schemaVersion: 1`, a generation timestamp, a bounded activity
 window, coverage metadata, repository findings, recommendations and limitations.

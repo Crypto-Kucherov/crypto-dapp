@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0 — 2026-09-28
+
+- Export profile reports and offline comparisons as standalone HTML with `--format html`.
+- Add responsive layouts, accessible tables and print styles without scripts or remote assets.
+- Preserve unknown values, incomplete counts, inspection limits and comparison warnings in browser reports.
+- Escape untrusted text, restrict report links and protect pages with a content security policy.
+- Include dated HTML examples and English/Russian instructions for sharing reports.
+
 ## 0.2.0 — 2026-09-27
 
 - Compare two saved profile reports offline with Markdown and JSON output.
