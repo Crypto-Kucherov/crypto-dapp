@@ -93,6 +93,21 @@ test('missing user fails clearly rather than fabricating an empty profile', asyn
   assert.match(captured.stderr, /not found/);
 });
 
+test('collection can signal incomplete API evidence while producing its report', async () => {
+  const complete = outputs();
+  assert.equal(await main(['alice', '--fail-on-incomplete'], complete.options), 0);
+  for (const strict of [false, true]) {
+    const client = publicClient();
+    const fetch = client.fetchImpl;
+    client.fetchImpl = async (...args) => args[0].pathname === '/search/issues' ? new Response('', { status: 503 }) : fetch(...args);
+    const { captured, options } = outputs(client);
+    const args = ['alice', '--format', 'json', ...(strict ? ['--fail-on-incomplete'] : [])];
+    assert.equal(await main(args, options), strict ? 2 : 0);
+    assert.equal(JSON.parse(captured.stdout).activity.pullRequests.count, null);
+    if (strict) assert.match(captured.stderr, /exit code 2/);
+  }
+});
+
 test('existing output files, directories and dangling links fail before any API request', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'output-preflight-'));
   try {

@@ -71,7 +71,7 @@ warnings and suggestions stay as saved. In particular, `apiRequests` describes t
 original collection, not this offline conversion. A message on stderr identifies
 the saved-data mode; stdout contains only the report.
 
-`--from` accepts only `--format` and `--out`, with Markdown as the default.
+`--from` accepts `--format`, `--out` and `--fail-on-incomplete`, with Markdown as the default.
 It cannot be combined with a username, `--compare`, `--since`, `--until` or `--max-repos`.
 Invalid JSON, unsupported schemas and inconsistent coverage fail before rendering.
 Existing files, including the source snapshot, are never overwritten.
@@ -225,10 +225,34 @@ README, report, or committed `.env` file. The CLI does not load `.env` files.
 
 Requests are sequential with a 15-second timeout. Detected rate limiting stops
 further requests and produces partial results if the profile and repo list are
-already available. Failure to obtain those basic inputs is an error. Authentication,
-network, missing-user and invalid-input failures return exit code 1; a report
-with explicit coverage warnings returns 0. Redirects are rejected, and tokens
+already available. Failure to obtain those basic inputs or invalid input returns
+exit code 1. Optional-check failures produce a report with coverage warnings and
+return 0 by default, or 2 with `--fail-on-incomplete`. Redirects are rejected, and tokens
 are never written into reports.
+
+### Fail a script on incomplete evidence
+
+```sh
+node src/index.js Crypto-Kucherov --fail-on-incomplete --format json --out reports/check.json
+node src/index.js --from reports/check.json --fail-on-incomplete
+```
+
+With `--fail-on-incomplete`, a profile is still written, but the process returns
+**2** if listing, activity counts or inspected repository evidence is unknown or
+incomplete. This includes capped commit counts, truncated trees and failed release
+checks. Known absence (such as no tests or no published release) is complete evidence
+and does not fail. Forks, archived repositories and projects intentionally excluded
+by `--max-repos` do not fail this check. It is not a code-quality gate.
+
+The flag supports fresh and saved profiles, not `--compare`. A comparison can have
+non-comparable windows even with complete input data. Plain report generation keeps
+its existing behavior. Automation can distinguish:
+
+| Exit code | Meaning |
+| --- | --- |
+| `0` | Report produced; inspect warnings for partial data unless the flag was used |
+| `1` | Input, collection or output error prevented report generation |
+| `2` | Report produced with incomplete evidence and `--fail-on-incomplete` was set |
 
 ## Development
 

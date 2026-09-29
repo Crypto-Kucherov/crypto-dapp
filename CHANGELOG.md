@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 — 2026-09-29
 
 - Reject existing output paths before collection without spending GitHub API quota; retain protection against write races.
 - Recognize repository README files in `.github/` and `docs/` as well as the root, avoiding incorrect missing-README suggestions.
 - Keep malformed GitHub search counts, file trees and stable-release responses unknown with explicit warnings.
 - Add inclusive UTC `--until` dates for historical activity windows while retaining the actual collection timestamp.
+- Add `--fail-on-incomplete` for fresh and saved profiles: preserve the report and return exit code 2 for incomplete evidence.
 
 ## 0.4.0 — 2026-09-29
 
