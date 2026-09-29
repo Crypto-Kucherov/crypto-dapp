@@ -72,7 +72,7 @@ original collection, not this offline conversion. A message on stderr identifies
 the saved-data mode; stdout contains only the report.
 
 `--from` accepts only `--format` and `--out`, with Markdown as the default.
-It cannot be combined with a username, `--compare`, `--since` or `--max-repos`.
+It cannot be combined with a username, `--compare`, `--since`, `--until` or `--max-repos`.
 Invalid JSON, unsupported schemas and inconsistent coverage fail before rendering.
 Existing files, including the source snapshot, are never overwritten.
 
@@ -143,7 +143,19 @@ and are included in the output; successful comparisons return exit code 0.
 - Practical suggestions based on the evidence and explicit warnings for partial data.
 
 The default window is the last 90 days, ending at the start of the run. `--since`
-accepts a real `YYYY-MM-DD` calendar date and starts at midnight UTC. PR searches
+accepts a real `YYYY-MM-DD` calendar date and starts at midnight UTC. `--until`
+sets an inclusive UTC end day; a past day ends at 23:59:59.999, while today stops
+at the start of the run. Future dates and reversed windows are rejected before
+any API request. Without `--since`, the window starts 90 days before its end.
+
+```sh
+node src/index.js Crypto-Kucherov --since 2026-08-01 --until 2026-08-31 --format json --out reports/august.json
+```
+
+`generatedAt` always describes collection time. The date window filters activity;
+it does not reconstruct historical file trees, repository lists or releases, which
+still describe the state observed at collection. Rerunning the same window may
+yield different counts after indexing, history or visibility changes. PR searches
 use creation dates; the external merged-PR metric uses merge dates. Repository
 file checks describe the current default branch, independent of the activity window.
 
