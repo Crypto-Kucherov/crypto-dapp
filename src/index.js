@@ -8,11 +8,12 @@ import { renderMarkdown } from './report.js';
 import { compareSnapshots, renderComparison } from './compare.js';
 import { renderHtml } from './html.js';
 import { readSnapshot, validateProfileReport } from './snapshot.js';
+import { hasIncompleteProfile } from './coverage.js';
 
 const HELP = `GitHub Activity Report
 
 Usage: node src/index.js USERNAME [options]
-       node src/index.js --from PROFILE.json [--format markdown|json|html] [--out PATH]
+       node src/index.js --from PROFILE.json [--format markdown|json|html] [--out PATH] [--fail-on-incomplete]
        node src/index.js --compare BEFORE.json AFTER.json [--format markdown|json|html] [--out PATH]
 
 Options:
@@ -23,6 +24,7 @@ Options:
   --max-repos N           Inspect 1–50 active original repos (default: 10)
   --compare BEFORE AFTER Compare two saved JSON snapshots offline (no token needed)
   --from PROFILE.json    Render a saved profile offline without refreshing its data
+  --fail-on-incomplete   Exit 2 after writing a profile with incomplete evidence
   --help                  Show this help
 
 Examples:
@@ -36,6 +38,7 @@ Examples:
 
 Optional: GITHUB_TOKEN for a higher GitHub API rate limit.
 Reads public data only. Does not calculate or predict Legion Score.
+Exit codes: 0 report produced; 1 error; 2 incomplete profile with --fail-on-incomplete.
 `;
 
 export function parseArgs(args) {
@@ -62,10 +65,15 @@ export function parseArgs(args) {
       options.username = validateUsername(arg);
       continue;
     }
-    if (!['--format', '--out', '--since', '--until', '--max-repos'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
+    if (!['--format', '--out', '--since', '--until', '--max-repos', '--fail-on-incomplete'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
     if ((options.compare || options.from) && ['--since', '--until', '--max-repos'].includes(arg)) throw new Error(`${arg} cannot change the coverage of saved snapshots.`);
     if (seen.has(arg)) throw new Error(`Duplicate option: ${arg}`);
     seen.add(arg);
+    if (arg === '--fail-on-incomplete') {
+      if (options.compare) throw new Error('--fail-on-incomplete supports profile reports, not comparisons.');
+      options.failOnIncomplete = true;
+      continue;
+    }
     const value = args[++index];
     if (!value || value.startsWith('--')) throw new Error(`Missing value for ${arg}.`);
     if (arg === '--format') options.format = value;
@@ -124,6 +132,10 @@ export async function main(args = process.argv.slice(2), {
     if (report.warnings.length || report.repositories?.some(repo => repo.warnings?.length)) {
       stderr.write(options.compare ? 'Read the comparison warnings before interpreting changes.\n'
         : 'Some checks are incomplete. Read the coverage warnings in the report.\n');
+    }
+    if (options.failOnIncomplete && hasIncompleteProfile(report)) {
+      stderr.write('Profile evidence is incomplete; report produced with exit code 2 (--fail-on-incomplete).\n');
+      return 2;
     }
     return 0;
   } catch (error) {
