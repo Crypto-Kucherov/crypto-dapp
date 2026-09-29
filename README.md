@@ -51,6 +51,29 @@ Download [the example profile HTML](examples/profile.html) or
 [the example comparison HTML](examples/comparison.html) and open it locally.
 These examples use the saved public data from 27 September 2026.
 
+## Convert a saved profile offline
+
+Already have a JSON profile? Use `--from` to render it without spending GitHub API
+requests or fetching newer data:
+
+```sh
+node src/index.js --from reports/profile.json --format html --out reports/profile.html
+node src/index.js --from reports/profile.json --out reports/profile.md
+node src/index.js --from examples/crypto-kucherov-after.json --format html --out reports/example-profile.html
+```
+
+The input must be a complete profile export with `schemaVersion: 1` (v0.1 and newer),
+including its coverage and interpretation fields; comparison exports are not accepted.
+Reports with explicitly unknown or incomplete evidence are supported. Dates, counts,
+warnings and suggestions stay as saved. In particular, `apiRequests` describes the
+original collection, not this offline conversion. A message on stderr identifies
+the saved-data mode; stdout contains only the report.
+
+`--from` accepts only `--format` and `--out`, with Markdown as the default.
+It cannot be combined with a username, `--compare`, `--since` or `--max-repos`.
+Invalid JSON, unsupported schemas and inconsistent coverage fail before rendering.
+Existing files, including the source snapshot, are never overwritten.
+
 ## Compare saved snapshots
 
 Comparison works entirely offline and needs no token. Pass the older JSON report

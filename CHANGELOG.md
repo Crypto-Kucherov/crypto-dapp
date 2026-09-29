@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Render a saved profile JSON as Markdown, HTML or JSON with `--from`, without GitHub requests.
+- Validate saved profile coverage and presentation fields while preserving original timestamps, counters and warnings.
+
 ## 0.3.0 — 2026-09-28
 
 - Export profile reports and offline comparisons as standalone HTML with `--format html`.
