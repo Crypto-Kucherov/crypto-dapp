@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Reject existing output paths before collection without spending GitHub API quota; retain protection against write races.
+
 ## 0.4.0 — 2026-09-29
 
 - Render a saved profile JSON as Markdown, HTML or JSON with `--from`, without GitHub requests.

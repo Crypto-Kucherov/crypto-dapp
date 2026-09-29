@@ -31,6 +31,8 @@ node src/index.js Crypto-Kucherov --since 2026-01-01 --max-repos 5
 ```
 
 Use a new output filename for each snapshot. Existing files are never overwritten.
+An existing output path is rejected before any GitHub requests, preserving API quota.
+The final write also refuses replacement if another process creates that file during collection.
 Without `--out`, the report goes to stdout; diagnostics go to stderr.
 
 ## Open a report in your browser

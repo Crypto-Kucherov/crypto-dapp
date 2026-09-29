@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -79,4 +79,40 @@ test('missing user fails clearly rather than fabricating an empty profile', asyn
   assert.equal(await main(['alice'], options), 1);
   assert.equal(captured.stdout, '');
   assert.match(captured.stderr, /not found/);
+});
+
+test('existing output files, directories and dangling links fail before any API request', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'output-preflight-'));
+  try {
+    const file = join(dir, 'saved.md');
+    const dangling = join(dir, 'dangling.md');
+    await writeFile(file, 'keep this report');
+    await symlink(join(dir, 'missing.md'), dangling);
+    for (const path of [file, dir, dangling, join(file, 'child.md')]) {
+      const client = publicClient();
+      const { options, captured } = outputs(client);
+      assert.equal(await main(['alice', '--out', path], options), 1);
+      assert.equal(client.requests, 0);
+      assert.equal(captured.stdout, '');
+      assert.match(captured.stderr, path.endsWith('child.md') ? /ENOTDIR/ : /already exists/);
+    }
+    assert.equal(await readFile(file, 'utf8'), 'keep this report');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a destination created during collection is still protected by the final write', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'output-race-'));
+  try {
+    const file = join(dir, 'report.md');
+    const client = publicClient();
+    const fetch = client.fetchImpl;
+    client.fetchImpl = async (...args) => {
+      if (args[0].pathname === '/users/alice') await writeFile(file, 'another process wrote this');
+      return fetch(...args);
+    };
+    const { options, captured } = outputs(client);
+    assert.equal(await main(['alice', '--out', file], options), 1);
+    assert.match(captured.stderr, /already exists/);
+    assert.equal(await readFile(file, 'utf8'), 'another process wrote this');
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
