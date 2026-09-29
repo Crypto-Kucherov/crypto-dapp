@@ -31,7 +31,7 @@ export function inspectTree(tree, licenseMetadata = null) {
   const paths = tree.tree.filter(entry => entry.type === 'blob').map(entry => entry.path);
   const meaningful = paths.filter(path => !/(^|\/)(node_modules|vendor|dist|build|coverage|\.git)\//i.test(path));
   const exists = regex => meaningful.some(path => regex.test(path)) ? true : (tree.truncated ? null : false);
-  const readme = exists(/^readme(?:\.(md|markdown|rst|txt))?$/i);
+  const readme = exists(/^(?:\.github\/|docs\/)?readme(?:\.(md|markdown|rst|txt))?$/i);
   const license = licenseMetadata?.spdx_id && licenseMetadata.spdx_id !== 'NOASSERTION'
     ? true : exists(/^(licen[cs]e|copying)(?:[.-][^/]+)?$/i);
   const tests = meaningful.some(isTestPath) ? true : (tree.truncated ? null : false);
@@ -111,7 +111,7 @@ export function recommend(report) {
     if (repo.checks.sourceFiles === 0 && repo.checks.sourceFilesComplete) {
       tips.push(`${repo.name}: if this is a code project, ship a working implementation and example; documentation-only projects may intentionally have no code.`);
     }
-    if (repo.checks.readme === false) tips.push(`${repo.name}: add a root README with purpose, installation and a reproducible example.`);
+    if (repo.checks.readme === false) tips.push(`${repo.name}: add a README in the root, .github/ or docs/ with purpose, installation and a reproducible example.`);
     if (repo.checks.license === false) tips.push(`${repo.name}: choose an appropriate license if you intend to share this as open source.`);
     if (repo.checks.sourceFiles > 0 && repo.checks.tests === false) tips.push(`${repo.name}: add tests for important behavior; no conventional test paths were detected.`);
     if (repo.checks.tests === true && repo.checks.ci === false) tips.push(`${repo.name}: consider running tests in GitHub Actions; no workflow file was detected.`);

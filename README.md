@@ -138,7 +138,7 @@ and are included in the output; successful comparisons return exit code 0.
 - Public PRs and issues created within the chosen time window.
 - Public PRs merged into repositories outside the account’s ownership within that window.
 - Attributed commits on inspected repositories’ current default branches.
-- Root README and license, conventional test paths, GitHub Actions files, and
+- Repository README and root license, conventional test paths, GitHub Actions files, and
   the latest published stable GitHub release.
 - Practical suggestions based on the evidence and explicit warnings for partial data.
 
@@ -165,6 +165,9 @@ last push may have been made by another contributor. These commit counts are
 
 File detection is a heuristic: a test file does not prove passing tests, and a
 workflow file does not prove successful CI. Nonstandard layouts may be missed.
+README detection checks the repository root, `.github/` and `docs/`, following
+[GitHub's documented overview locations](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes).
+A README nested inside a package or guide does not satisfy this overview check.
 Source-file counting recognizes common languages and excludes common generated
 and dependency folders; documentation-only projects can legitimately have no code.
 Recommendations are portfolio suggestions, not a quality rating or Legion policy.
