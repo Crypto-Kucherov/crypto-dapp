@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GitHubClient, validateUsername } from './github.js';
@@ -86,6 +86,15 @@ export async function main(args = process.argv.slice(2), {
   try {
     const options = parseArgs(args);
     if (options.help) { stdout.write(HELP); return 0; }
+    const target = options.out ? resolve(options.out) : null;
+    if (target) {
+      // Avoid spending API quota on a report that cannot be saved. lstat also
+      // catches dangling symlinks; the final exclusive write still handles races.
+      let exists = true;
+      try { await lstat(target); }
+      catch (error) { if (error.code === 'ENOENT') exists = false; else throw error; }
+      if (exists) throw Object.assign(new Error('Output already exists.'), { code: 'EEXIST' });
+    }
     let report;
     if (options.compare) {
       const snapshots = [];
@@ -103,8 +112,7 @@ export async function main(args = process.argv.slice(2), {
     const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n`
       : options.format === 'html' ? renderHtml(report)
       : options.compare ? renderComparison(report) : renderMarkdown(report);
-    if (options.out) {
-      const target = resolve(options.out);
+    if (target) {
       await mkdir(dirname(target), { recursive: true });
       // Refuse to destroy an earlier snapshot or accidentally overwrite project code.
       await writeFile(target, output, { encoding: 'utf8', flag: 'wx', mode: 0o600 });
