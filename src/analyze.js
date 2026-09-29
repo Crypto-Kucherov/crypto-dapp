@@ -4,6 +4,23 @@ const DAY = 86400000;
 const UNKNOWN_CHECKS = { readme: null, license: null, tests: null, ci: null, sourceFiles: null };
 const SOURCE_EXTENSION = /\.(?:[cm]?[jt]sx?|py|rs|go|sol|vy|java|kt|swift|c|h|cpp|hpp|cs|rb|php|ex|exs|sh|vue|svelte)$/i;
 
+function isTreeResponse(tree) {
+  return tree !== null && typeof tree === 'object' && Array.isArray(tree.tree)
+    && typeof tree.truncated === 'boolean'
+    && tree.tree.every(entry => entry !== null && typeof entry === 'object'
+      && ['blob', 'tree', 'commit'].includes(entry.type)
+      && typeof entry.path === 'string' && entry.path.length > 0);
+}
+
+function isStableRelease(release) {
+  if (!release || typeof release.tag_name !== 'string' || !release.tag_name.trim()
+    || release.draft !== false || release.prerelease !== false || typeof release.html_url !== 'string') return false;
+  try {
+    const url = new URL(release.html_url);
+    return url.protocol === 'https:' && url.hostname === 'github.com' && !url.username && !url.password;
+  } catch { return false; }
+}
+
 function isTestPath(path) {
   // A README or data fixture in tests/ alone is not evidence of test code.
   if (!SOURCE_EXTENSION.test(path)) return false;
@@ -27,7 +44,7 @@ export function parseSince(value, now) {
 }
 
 export function inspectTree(tree, licenseMetadata = null) {
-  if (!tree || !Array.isArray(tree.tree)) return { ...UNKNOWN_CHECKS };
+  if (!isTreeResponse(tree)) return { ...UNKNOWN_CHECKS };
   const paths = tree.tree.filter(entry => entry.type === 'blob').map(entry => entry.path);
   const meaningful = paths.filter(path => !/(^|\/)(node_modules|vendor|dist|build|coverage|\.git)\//i.test(path));
   const exists = regex => meaningful.some(path => regex.test(path)) ? true : (tree.truncated ? null : false);
@@ -44,7 +61,7 @@ export function inspectTree(tree, licenseMetadata = null) {
 async function searchCount(client, query) {
   try {
     const { data } = await client.get(`/search/issues?${new URLSearchParams({ q: query, per_page: '1' })}`);
-    if (!Number.isInteger(data.total_count) || typeof data.incomplete_results !== 'boolean') {
+    if (!Number.isSafeInteger(data?.total_count) || data.total_count < 0 || typeof data.incomplete_results !== 'boolean') {
       throw new GitHubError('Unexpected GitHub search response.');
     }
     return { count: data.total_count, complete: !data.incomplete_results,
@@ -74,7 +91,7 @@ async function inspectRepository(client, repo, username, since, until) {
   };
   try {
     const { data } = await client.get(`${base}/git/trees/${encodeURIComponent(repo.default_branch)}?recursive=1`);
-    if (!Array.isArray(data.tree)) throw new GitHubError('Unexpected repository tree response.');
+    if (!isTreeResponse(data)) throw new GitHubError('Unexpected repository tree response.');
     result.checks = inspectTree(data, repo.license);
     if (data.truncated) result.warnings.push('File tree is truncated; missing files cannot be ruled out.');
   } catch (error) {
@@ -92,6 +109,7 @@ async function inspectRepository(client, repo, username, since, until) {
   }
   try {
     const { data } = await client.get(`${base}/releases/latest`);
+    if (!isStableRelease(data)) throw new GitHubError('Unexpected GitHub stable release response.');
     result.release = { status: 'present', tag: data.tag_name, url: data.html_url };
   } catch (error) {
     if (error.status === 404) result.release = { status: 'absent', tag: null, url: null };

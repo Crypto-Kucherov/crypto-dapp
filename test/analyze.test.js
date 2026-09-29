@@ -158,6 +158,58 @@ test('unavailable activity stays unknown and produces no missing-PR advice', asy
   assert.match(renderMarkdown(report), /Coverage warnings/);
 });
 
+test('invalid GitHub search totals stay unknown instead of becoming complete counts', async () => {
+  for (const data of [null, { total_count: -1, incomplete_results: false },
+    { total_count: Number.MAX_SAFE_INTEGER + 1, incomplete_results: false },
+    { total_count: 1.5, incomplete_results: false }, { total_count: 0, incomplete_results: 'false' }]) {
+    const { client } = fixtureClient({ override: url => url.pathname === '/search/issues' ? Response.json(data) : undefined });
+    const report = await analyzeProfile(client, 'alice', { now: NOW });
+    assert.ok(Object.values(report.activity).every(metric => metric.count === null && !metric.complete));
+    assert.ok(report.warnings.some(warning => warning.includes('Unexpected GitHub search response')));
+    assert.ok(!report.recommendations.some(tip => tip.includes('no merged public PRs')));
+  }
+});
+
+test('malformed tree entries and missing truncation metadata never imply absent files', async () => {
+  for (const data of [null, { tree: [] }, { tree: [], truncated: 'false' },
+    { tree: [null], truncated: false }, { tree: [{ type: 'blob' }], truncated: false },
+    { tree: [{ type: 'unknown', path: 'README.md' }], truncated: false }]) {
+    assert.equal(inspectTree(data).sourceFiles, null);
+    const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/') ? Response.json(data) : undefined });
+    const report = await analyzeProfile(client, 'alice', { now: NOW });
+    assert.equal(report.repositories[0].checks.readme, null);
+    assert.equal(report.repositories[0].checks.tests, null);
+    assert.match(report.repositories[0].warnings[0], /Unexpected repository tree response/);
+    assert.ok(!report.recommendations.some(tip => tip.includes('add a README') || tip.includes('add tests')));
+  }
+});
+
+test('empty complete trees and valid non-file entries remain supported', () => {
+  const result = inspectTree({ truncated: false, tree: [
+    { type: 'tree', path: 'src' }, { type: 'commit', path: 'submodules/library' },
+  ] });
+  assert.equal(result.sourceFiles, 0);
+  assert.equal(result.sourceFilesComplete, true);
+  assert.equal(result.readme, false);
+  assert.equal(inspectTree(tree([])).tests, false);
+});
+
+test('malformed or non-stable latest-release responses remain unknown with a warning', async () => {
+  const stable = { tag_name: 'v1.0.0', html_url: 'https://github.com/alice/tool/releases/tag/v1.0.0', draft: false, prerelease: false };
+  for (const data of [null, {}, { ...stable, tag_name: '' }, { ...stable, draft: true },
+    { ...stable, prerelease: true }, { ...stable, html_url: 'javascript:PRIVATE_MARKER' }]) {
+    const { client } = fixtureClient({ override: url => url.pathname.endsWith('/releases/latest') ? Response.json(data) : undefined });
+    const report = await analyzeProfile(client, 'alice', { now: NOW });
+    assert.equal(report.repositories[0].release.status, 'unknown');
+    assert.ok(report.repositories[0].warnings.some(warning => warning.includes('Unexpected GitHub stable release response')));
+    assert.ok(!JSON.stringify(report).includes('PRIVATE_MARKER'));
+    assert.ok(!report.recommendations.some(tip => tip.includes('publish a release')));
+  }
+  const { client } = fixtureClient({ override: url => url.pathname.endsWith('/releases/latest') ? Response.json(stable) : undefined });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.deepEqual(report.repositories[0].release, { status: 'present', tag: stable.tag_name, url: stable.html_url });
+});
+
 test('a truncated tree does not produce false missing-file advice', async () => {
   const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/') ? Response.json(tree(['README.md'], true)) : undefined });
   const report = await analyzeProfile(client, 'alice', { now: NOW });

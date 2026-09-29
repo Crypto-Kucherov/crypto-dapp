@@ -163,6 +163,10 @@ converted to zero. Counts after a pagination cap are lower bounds. A repositoryâ
 last push may have been made by another contributor. These commit counts are
 **not** the contribution calendar on your GitHub profile.
 
+Search counts must be nonnegative safe integers with explicit completeness metadata.
+Malformed file trees or latest-release payloads become **Unknown** with a warning;
+they do not establish missing files, a missing release or complete coverage.
+
 File detection is a heuristic: a test file does not prove passing tests, and a
 workflow file does not prove successful CI. Nonstandard layouts may be missed.
 README detection checks the repository root, `.github/` and `docs/`, following
