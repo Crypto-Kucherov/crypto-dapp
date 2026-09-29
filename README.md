@@ -167,6 +167,29 @@ Source-file counting recognizes common languages and excludes common generated
 and dependency folders; documentation-only projects can legitimately have no code.
 Recommendations are portfolio suggestions, not a quality rating or Legion policy.
 
+### Recognized test paths
+
+Only files with a recognized source-code extension can establish test-path evidence.
+Documentation, images and data alone under `tests/` or `spec/` do not count. The same
+generated/dependency-folder exclusions apply to both source counting and test checks.
+
+| Layout | Examples recognized by this tool |
+| --- | --- |
+| Code under `test/`, `tests/`, `spec/`, `specs/`, `__tests__/` at any depth | `tests/run.sh`, `spec/parser.rb`, `test/Contract.sol` |
+| JavaScript / TypeScript | `parser.test.js`, `widget.spec.tsx`, `parser-test.mjs` |
+| Python | `test_parser.py`, `parser_test.py` |
+| Go / Rust | `parser_test.go`, `parser_test.rs` |
+| Ruby / Elixir | `parser_test.rb`, `parser_spec.rb`, `parser_test.exs` |
+| Solidity | `Vault.t.sol` |
+| Java / Kotlin / C# / PHP | `UserTest.java`, `UserTests.kt`, `CalculatorTests.cs`, `UserTest.php`, `TestAccount.java` |
+
+Class-style `Test` / `Tests` suffixes and the `Test` prefix are case-sensitive.
+The prefix must be followed by an uppercase letter, digit or underscore to avoid
+matching names such as `Testament.cs`. These are filename heuristics, so helper
+code may also match; inline tests and nonstandard layouts may be missed.
+If a tree is truncated and no matching test was found, the result remains **Unknown**.
+Already-saved reports retain their original checks when rendered with `--from`.
+
 ## GitHub API access
 
 The CLI only issues GET requests to `https://api.github.com`; it does not publish
