@@ -56,6 +56,25 @@ test('supports Go, colocated JS tests and Python test files', () => {
   for (const path of ['pkg/main_test.go', 'src/index.test.mjs', 'src/button.spec.tsx', 'test_parser.py']) assert.equal(inspectTree(tree([path])).tests, true, path);
 });
 
+test('recognizes README files in GitHub repository overview locations', () => {
+  for (const path of ['README.md', '.github/README.md', 'docs/readme.rst', 'docs/README', '.github/readme.txt']) {
+    assert.equal(inspectTree(tree([path])).readme, true, path);
+    assert.equal(inspectTree(tree([path], true)).readme, true, path);
+  }
+  const nested = ['packages/tool/README.md', 'docs/guides/README.md', 'vendor/README.md'];
+  assert.equal(inspectTree(tree(nested)).readme, false);
+  assert.equal(inspectTree(tree(nested, true)).readme, null);
+});
+
+test('a docs or .github README does not trigger missing-README advice', async () => {
+  for (const path of ['docs/README.md', '.github/README.md']) {
+    const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/') ? Response.json(tree([path, 'src/main.js'])) : undefined });
+    const report = await analyzeProfile(client, 'alice', { now: NOW });
+    assert.equal(report.repositories[0].checks.readme, true);
+    assert.ok(!report.recommendations.some(tip => tip.includes('add a README')));
+  }
+});
+
 test('documentation and data in test folders do not establish test code', () => {
   const paths = ['tests/README.md', 'test/example.json', 'spec/schema.yaml', '__tests__/image.png', 'specs/notes.txt'];
   assert.equal(inspectTree(tree(paths)).tests, false);
