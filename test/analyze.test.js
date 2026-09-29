@@ -56,6 +56,52 @@ test('supports Go, colocated JS tests and Python test files', () => {
   for (const path of ['pkg/main_test.go', 'src/index.test.mjs', 'src/button.spec.tsx', 'test_parser.py']) assert.equal(inspectTree(tree([path])).tests, true, path);
 });
 
+test('documentation and data in test folders do not establish test code', () => {
+  const paths = ['tests/README.md', 'test/example.json', 'spec/schema.yaml', '__tests__/image.png', 'specs/notes.txt'];
+  assert.equal(inspectTree(tree(paths)).tests, false);
+  assert.equal(inspectTree(tree(paths)).sourceFiles, 0);
+  assert.equal(inspectTree(tree(paths, true)).tests, null);
+});
+
+test('recognizes conventional colocated test names across supported languages', () => {
+  for (const path of ['src/Vault.t.sol', 'app/UserTest.java', 'app/UserTests.kt', 'app/TestAccount.java',
+    'src/CalculatorTests.cs', 'src/AccountTest.php', 'lib/parser_test.rb', 'lib/parser_spec.rb',
+    'lib/parser_test.exs', 'src/widget.spec.cjs', 'pkg/parser_test.rs']) {
+    const result = inspectTree(tree([path]));
+    assert.equal(result.tests, true, path);
+    assert.equal(result.sourceFiles, 1, path);
+  }
+});
+
+test('test directories still recognize code and ignore generated copies of named tests', () => {
+  for (const path of ['tests/run.sh', '__tests__/Widget.tsx', 'spec/parser.rb', 'test/Contract.sol']) {
+    assert.equal(inspectTree(tree([path])).tests, true, path);
+    assert.equal(inspectTree(tree([path], true)).tests, true, path);
+  }
+  const copies = ['vendor/library/UserTest.php', 'node_modules/pkg/test.spec.js', 'build/TestAccount.java',
+    'dist/Vault.t.sol', 'coverage/parser_test.exs'];
+  assert.equal(inspectTree(tree(copies)).tests, false);
+  assert.equal(inspectTree(tree(copies, true)).tests, null);
+});
+
+test('similar production names and test documentation do not match named-test conventions', () => {
+  for (const path of ['src/Latest.java', 'src/Contest.php', 'src/Testament.cs', 'docs/AccountTest.md',
+    'docs/parser_spec.rb.md', 'src/testing.py', 'src/widget.spec.json']) {
+    assert.equal(inspectTree(tree([path])).tests, false, path);
+  }
+});
+
+test('test-path recommendations distinguish documentation-only folders from recognized code', async () => {
+  for (const [paths, expectsAdvice] of [
+    [['src/User.php', 'tests/README.md'], true],
+    [['src/User.php', 'src/UserTest.php'], false],
+  ]) {
+    const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/') ? Response.json(tree(paths)) : undefined });
+    const report = await analyzeProfile(client, 'alice', { now: NOW });
+    assert.equal(report.recommendations.some(tip => tip.includes('add tests')), expectsAdvice);
+  }
+});
+
 test('analyzes public originals, excludes private repos, and separates forks and archived repos', async () => {
   const { client, seen } = fixtureClient({ repos: [repository('tool'), repository('copy', { fork: true }),
     repository('old', { archived: true }), repository('private-work', { private: true }), repository('second')] });

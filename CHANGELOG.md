@@ -1,9 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 — 2026-09-29
 
 - Render a saved profile JSON as Markdown, HTML or JSON with `--from`, without GitHub requests.
 - Validate saved profile coverage and presentation fields while preserving original timestamps, counters and warnings.
+- Stop treating documentation or data-only test folders as evidence of test code.
+- Recognize additional Solidity, Java, Kotlin, C#, PHP, Ruby and Elixir test filenames, with documented heuristic limits.
+- Extend coverage to 62 offline tests.
 
 ## 0.3.0 — 2026-09-28
 

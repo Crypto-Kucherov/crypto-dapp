@@ -2,6 +2,18 @@ import { GitHubError, validateUsername } from './github.js';
 
 const DAY = 86400000;
 const UNKNOWN_CHECKS = { readme: null, license: null, tests: null, ci: null, sourceFiles: null };
+const SOURCE_EXTENSION = /\.(?:[cm]?[jt]sx?|py|rs|go|sol|vy|java|kt|swift|c|h|cpp|hpp|cs|rb|php|ex|exs|sh|vue|svelte)$/i;
+
+function isTestPath(path) {
+  // A README or data fixture in tests/ alone is not evidence of test code.
+  if (!SOURCE_EXTENSION.test(path)) return false;
+  if (/(^|\/)(__tests__|tests?|specs?)\//i.test(path)) return true;
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  return /^.+[.-](test|spec)\.[cm]?[jt]sx?$/i.test(name)
+    || /^(?:test_.+\.py|.+_test\.(?:go|py|rs|rb|exs)|.+_spec\.rb|.+\.t\.sol)$/i.test(name)
+    // Keep class-style test markers case-sensitive: Contest.php is not a test.
+    || /^(?:Test[A-Z0-9_][\w.-]*|[\w.-]+Tests?)\.(?:java|kt|cs|php)$/.test(name);
+}
 
 export function parseSince(value, now) {
   if (value === undefined) return new Date(now.getTime() - 90 * DAY).toISOString();
@@ -22,10 +34,10 @@ export function inspectTree(tree, licenseMetadata = null) {
   const readme = exists(/^readme(?:\.(md|markdown|rst|txt))?$/i);
   const license = licenseMetadata?.spdx_id && licenseMetadata.spdx_id !== 'NOASSERTION'
     ? true : exists(/^(licen[cs]e|copying)(?:[.-][^/]+)?$/i);
-  const tests = exists(/(^|\/)(__tests__|tests?|specs?)\/|(?:^|\/)(?:test_[^/]+\.py|[^/]+(?:[.-](?:test|spec)\.[cm]?[jt]sx?|_test\.(?:go|py|rs)))$/i);
+  const tests = meaningful.some(isTestPath) ? true : (tree.truncated ? null : false);
   const ci = exists(/^\.github\/workflows\/[^/]+\.ya?ml$/i);
   const sourceFiles = meaningful.filter(path => !path.startsWith('.github/')
-    && /\.(?:[cm]?[jt]sx?|py|rs|go|sol|vy|java|kt|swift|c|h|cpp|hpp|cs|rb|php|ex|exs|sh|vue|svelte)$/i.test(path)).length;
+    && SOURCE_EXTENSION.test(path)).length;
   return { readme, license, tests, ci, sourceFiles, sourceFilesComplete: !tree.truncated };
 }
 
