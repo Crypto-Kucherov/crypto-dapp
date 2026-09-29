@@ -4,6 +4,7 @@
 
 - Reject existing output paths before collection without spending GitHub API quota; retain protection against write races.
 - Recognize repository README files in `.github/` and `docs/` as well as the root, avoiding incorrect missing-README suggestions.
+- Keep malformed GitHub search counts, file trees and stable-release responses unknown with explicit warnings.
 
 ## 0.4.0 — 2026-09-29
 
