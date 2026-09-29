@@ -18,7 +18,8 @@ Usage: node src/index.js USERNAME [options]
 Options:
   --format markdown|json|html  Output format (default: markdown)
   --out PATH              Save to a new file instead of stdout
-  --since YYYY-MM-DD       Activity start date, UTC (default: 90 days ago)
+  --since YYYY-MM-DD       Activity start date, UTC (default: 90 days before end)
+  --until YYYY-MM-DD       Inclusive activity end date, UTC (default: now)
   --max-repos N           Inspect 1–50 active original repos (default: 10)
   --compare BEFORE AFTER Compare two saved JSON snapshots offline (no token needed)
   --from PROFILE.json    Render a saved profile offline without refreshing its data
@@ -29,6 +30,7 @@ Examples:
   node src/index.js Crypto-Kucherov --format json --out reports/profile.json
   node src/index.js Crypto-Kucherov --format html --out reports/profile.html
   node src/index.js Crypto-Kucherov --since 2026-01-01 --max-repos 5
+  node src/index.js Crypto-Kucherov --since 2026-08-01 --until 2026-08-31
   node src/index.js --compare reports/before.json reports/after.json
   node src/index.js --from reports/profile.json --format html --out reports/profile.html
 
@@ -60,8 +62,8 @@ export function parseArgs(args) {
       options.username = validateUsername(arg);
       continue;
     }
-    if (!['--format', '--out', '--since', '--max-repos'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
-    if ((options.compare || options.from) && ['--since', '--max-repos'].includes(arg)) throw new Error(`${arg} cannot change the coverage of saved snapshots.`);
+    if (!['--format', '--out', '--since', '--until', '--max-repos'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
+    if ((options.compare || options.from) && ['--since', '--until', '--max-repos'].includes(arg)) throw new Error(`${arg} cannot change the coverage of saved snapshots.`);
     if (seen.has(arg)) throw new Error(`Duplicate option: ${arg}`);
     seen.add(arg);
     const value = args[++index];
@@ -69,6 +71,7 @@ export function parseArgs(args) {
     if (arg === '--format') options.format = value;
     if (arg === '--out') options.out = value;
     if (arg === '--since') options.since = value;
+    if (arg === '--until') options.until = value;
     if (arg === '--max-repos') {
       if (!/^\d+$/.test(value)) throw new Error('--max-repos must be an integer from 1 to 50.');
       options.maxRepos = Number(value);

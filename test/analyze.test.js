@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GitHubClient } from '../src/github.js';
-import { analyzeProfile, inspectTree, parseSince } from '../src/analyze.js';
+import { analyzeProfile, inspectTree, parseSince, parseUntil } from '../src/analyze.js';
 import { renderMarkdown } from '../src/report.js';
 
 const NOW = new Date('2026-09-27T12:00:00.000Z');
@@ -33,6 +33,43 @@ test('calendar validation rejects rollover dates and future dates', () => {
   assert.equal(parseSince('2024-02-29', NOW), '2024-02-29T00:00:00.000Z');
   assert.equal(parseSince(undefined, NOW), '2026-06-29T12:00:00.000Z');
   for (const value of ['2026-02-29', '2026-02-30', '2026-13-01', '2026-09-28', 'yesterday', '2026-9-2']) assert.throws(() => parseSince(value, NOW));
+});
+
+test('end dates include a full past UTC day but never future time', () => {
+  assert.equal(parseUntil(undefined, NOW), NOW.toISOString());
+  assert.equal(parseUntil('2024-02-29', NOW), '2024-02-29T23:59:59.999Z');
+  assert.equal(parseUntil('2026-09-27', NOW), NOW.toISOString());
+  for (const value of ['2026-02-29', '2026-13-01', '2026-09-28', '2026-9-2', 'yesterday']) assert.throws(() => parseUntil(value, NOW));
+});
+
+test('historical windows reach all activity requests and keep the actual collection timestamp', async () => {
+  const { client, seen } = fixtureClient();
+  const report = await analyzeProfile(client, 'alice', { now: NOW, since: '2026-08-01', until: '2026-08-31' });
+  assert.equal(report.generatedAt, NOW.toISOString());
+  assert.equal(report.scope.since, '2026-08-01T00:00:00.000Z');
+  assert.equal(report.scope.until, '2026-08-31T23:59:59.999Z');
+  const queries = seen.filter(url => url.pathname === '/search/issues').map(url => url.searchParams.get('q'));
+  assert.equal(queries.length, 3);
+  assert.ok(queries.every(q => q.includes('2026-08-01T00:00:00.000Z..2026-08-31T23:59:59.999Z')));
+  const commits = seen.find(url => url.pathname.endsWith('/commits'));
+  assert.equal(commits.searchParams.get('since'), report.scope.since);
+  assert.equal(commits.searchParams.get('until'), report.scope.until);
+});
+
+test('a historical end anchors the default 90-day window', async () => {
+  const { client } = fixtureClient();
+  const report = await analyzeProfile(client, 'alice', { now: NOW, until: '2026-09-01' });
+  assert.equal(report.scope.since, '2026-06-03T23:59:59.999Z');
+  assert.equal(report.scope.until, '2026-09-01T23:59:59.999Z');
+});
+
+test('reversed or future activity windows fail before the first GitHub request', async () => {
+  for (const options of [{ since: '2026-09-02', until: '2026-09-01' },
+    { until: '2026-09-28' }, { until: '2026-02-30' }, { until: '0000-01-01' }]) {
+    const { client, seen } = fixtureClient();
+    await assert.rejects(analyzeProfile(client, 'alice', { now: NOW, ...options }), /--since|--until/);
+    assert.equal(seen.length, 0);
+  }
 });
 
 test('tree checks skip vendored code and distinguish truncated absence', () => {

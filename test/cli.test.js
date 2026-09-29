@@ -48,6 +48,18 @@ test('JSON output is machine-readable without stdout progress text', async () =>
   assert.equal(captured.stderr, '');
 });
 
+test('CLI passes an explicit end date to collection and rejects it in offline modes', async () => {
+  const { options, captured } = outputs();
+  assert.equal(await main(['alice', '--since', '2024-02-01', '--until', '2024-02-29', '--format', 'json'], options), 0);
+  const report = JSON.parse(captured.stdout);
+  assert.equal(report.scope.until, '2024-02-29T23:59:59.999Z');
+  assert.ok(report.generatedAt > report.scope.until);
+  for (const args of [['alice', '--until'], ['alice', '--until', '2024-01-01', '--until', '2024-02-01'],
+    ['--from', 'a.json', '--until', '2024-02-29'], ['--compare', 'a.json', 'b.json', '--until', '2024-02-29']]) {
+    assert.throws(() => parseArgs(args));
+  }
+});
+
 test('profile collection supports standalone HTML on stdout', async () => {
   const { options, captured } = outputs();
   assert.equal(await main(['alice', '--format', 'html'], options), 0);

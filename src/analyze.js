@@ -32,15 +32,28 @@ function isTestPath(path) {
     || /^(?:Test[A-Z0-9_][\w.-]*|[\w.-]+Tests?)\.(?:java|kt|cs|php)$/.test(name);
 }
 
-export function parseSince(value, now) {
-  if (value === undefined) return new Date(now.getTime() - 90 * DAY).toISOString();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('--since must use YYYY-MM-DD.');
+function parseDate(value, option) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error(`${option} must use YYYY-MM-DD.`);
   const date = new Date(`${value}T00:00:00.000Z`);
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
-    throw new Error('--since must be a real calendar date.');
+    throw new Error(`${option} must be a real calendar date.`);
   }
+  return date;
+}
+
+export function parseSince(value, now) {
+  if (value === undefined) return new Date(now.getTime() - 90 * DAY).toISOString();
+  const date = parseDate(value, '--since');
   if (date > now) throw new Error('--since cannot be in the future.');
   return date.toISOString();
+}
+
+export function parseUntil(value, now) {
+  if (value === undefined) return now.toISOString();
+  const date = parseDate(value, '--until');
+  if (date > now) throw new Error('--until cannot be in the future.');
+  // Past days include their final millisecond; today stops at collection time.
+  return new Date(Math.min(date.getTime() + DAY - 1, now.getTime())).toISOString();
 }
 
 export function inspectTree(tree, licenseMetadata = null) {
@@ -142,11 +155,13 @@ export function recommend(report) {
   return tips;
 }
 
-export async function analyzeProfile(client, username, { since: sinceInput, maxRepos = 10, now = new Date() } = {}) {
+export async function analyzeProfile(client, username, { since: sinceInput, until: untilInput, maxRepos = 10, now = new Date() } = {}) {
   validateUsername(username);
   if (!Number.isInteger(maxRepos) || maxRepos < 1 || maxRepos > 50) throw new Error('--max-repos must be an integer from 1 to 50.');
-  const since = parseSince(sinceInput, now);
-  const until = now.toISOString();
+  const until = parseUntil(untilInput, now);
+  const since = parseSince(sinceInput, sinceInput === undefined ? new Date(until) : now);
+  if (!/^\d{4}-/.test(since)) throw new Error('The default window starts before year 0000; specify --since.');
+  if (Date.parse(since) > Date.parse(until)) throw new Error('--since must be on or before --until.');
   const { data: profile } = await client.get(`/users/${encodeURIComponent(username)}`);
   if (profile.type !== 'User') throw new Error('This tool reports on personal GitHub accounts, not organizations.');
   username = validateUsername(profile.login);
@@ -179,7 +194,7 @@ export async function analyzeProfile(client, username, { since: sinceInput, maxR
   for (const [name, value] of Object.entries(activity)) if (value.warning) warnings.push(`${name}: ${value.warning}`);
   const report = {
     schemaVersion: 1,
-    generatedAt: until,
+    generatedAt: now.toISOString(),
     profile: { login: username, name: profile.name, url: profile.html_url, bio: profile.bio,
       createdAt: profile.created_at, publicRepositories: profile.public_repos,
       followers: profile.followers, following: profile.following },
