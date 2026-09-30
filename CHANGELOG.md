@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.0 — 2026-09-30
+
+- Distinguish explicit empty-repository responses from generic conflicts, preserving unknown evidence when emptiness is unconfirmed.
+- Deduplicate paginated repository identities and commit SHAs, preserving warnings and marking affected coverage incomplete.
+- Stop requests on secondary-limit messages even without retry or quota-exhaustion headers.
+- Preserve stable repository IDs, follow renames, and suppress comparisons when a name refers to a different repository.
+- Add offline `--version` / `-v` diagnostics and keep the GitHub User-Agent version in sync with package metadata.
+
 ## 0.5.0 — 2026-09-29
 
 - Reject existing output paths before collection without spending GitHub API quota; retain protection against write races.

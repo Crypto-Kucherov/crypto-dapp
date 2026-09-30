@@ -1,3 +1,5 @@
+import { USER_AGENT } from './version.js';
+
 const API_ORIGIN = 'https://api.github.com';
 
 export class GitHubError extends Error {
@@ -38,7 +40,7 @@ export class GitHubClient {
     }
     const headers = {
       Accept: 'application/vnd.github+json',
-      'User-Agent': 'crypto-dapp-github-report/0.1.0',
+      'User-Agent': USER_AGENT,
       'X-GitHub-Api-Version': '2022-11-28',
     };
     if (this.token) headers.Authorization = `Bearer ${this.token}`;
