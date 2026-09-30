@@ -85,3 +85,44 @@ test('recognizes explicit empty-repository conflicts without reflecting response
       error.status === 409 && error.emptyRepository === expected && !error.message.includes('PRIVATE_MARKER'));
   }
 });
+
+test('deduplicates records within and across pages and preserves uncertain coverage', async () => {
+  const pages = [[{ id: 'a', name: 'first' }, { id: 'a', name: 'first' }],
+    [{ id: 'a', name: 'renamed' }, { id: 'b', name: 'second' }]];
+  const client = new GitHubClient({ fetchImpl: async url => Response.json(pages[Number(url.searchParams.get('page')) - 1],
+    url.searchParams.get('page') === '1' ? { headers: { link: '<https://api.github.com/next>; rel="next"' } } : {}) });
+  const result = await client.paginate('/users/alice/repos', { itemKeys: item => [item.id, `name:${item.name}`] });
+  assert.deepEqual(result.items, [{ id: 'a', name: 'first' }, { id: 'b', name: 'second' }]);
+  assert.equal(result.complete, false);
+  assert.match(result.warning, /Repeated records/);
+});
+
+test('duplicate warnings survive later failures and page limits', async () => {
+  for (const maxPages of [1, 2]) {
+    const client = new GitHubClient({ fetchImpl: async url => url.searchParams.get('page') === '1'
+      ? Response.json([{ sha: 'a' }, { sha: 'a' }], { headers: { link: '<https://api.github.com/next>; rel="next"' } })
+      : new Response('', { status: 502 }) });
+    const result = await client.paginate('/repos/a/b/commits', { maxPages, itemKeys: item => [item.sha] });
+    assert.deepEqual(result.items, [{ sha: 'a' }]);
+    assert.equal(result.complete, false);
+    assert.match(result.warning, /Repeated records/);
+    assert.match(result.warning, maxPages === 1 ? /Stopped after/ : /502/);
+  }
+});
+
+test('invalid list identities fail safely and retain validated earlier pages', async () => {
+  for (const bad of [null, {}, { sha: 42 }, { sha: '' }]) {
+    for (const first of [true, false]) {
+      const client = new GitHubClient({ fetchImpl: async url => first || url.searchParams.get('page') === '2'
+        ? Response.json([bad]) : Response.json([{ sha: 'good' }], { headers: { link: '<https://api.github.com/next>; rel="next"' } }) });
+      const pending = client.paginate('/repos/a/b/commits', { itemKeys: item => [item.sha] });
+      if (first) await assert.rejects(pending, /list entry identity/);
+      else {
+        const result = await pending;
+        assert.deepEqual(result.items, [{ sha: 'good' }]);
+        assert.equal(result.complete, false);
+        assert.match(result.warning, /list entry identity/);
+      }
+    }
+  }
+});
