@@ -233,7 +233,10 @@ README, report, or committed `.env` file. The CLI does not load `.env` files.
 
 Requests are sequential with a 15-second timeout. Detected rate limiting stops
 further requests and produces partial results if the profile and repo list are
-already available. Failure to obtain those basic inputs or invalid input returns
+already available. Secondary-limit messages are recognized even when GitHub omits
+`Retry-After` and the primary quota is not exhausted. Ordinary permission errors
+do not suppress unrelated checks, and API response bodies are not copied to reports.
+Failure to obtain those basic inputs or invalid input returns
 exit code 1. Optional-check failures produce a report with coverage warnings and
 return 0 by default, or 2 with `--fail-on-incomplete`. Redirects are rejected, and tokens
 are never written into reports.
