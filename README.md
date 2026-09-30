@@ -175,6 +175,10 @@ converted to zero. Counts after a pagination cap are lower bounds. A repositoryâ
 last push may have been made by another contributor. These commit counts are
 **not** the contribution calendar on your GitHub profile.
 
+Repeated repositories (by name or ID) and commit SHAs are counted once. Repeated
+records make pagination incomplete because changing page order may also omit
+records. Reports preserve this warning, including after later page failures.
+
 Search counts must be nonnegative safe integers with explicit completeness metadata.
 Malformed file trees or latest-release payloads become **Unknown** with a warning;
 they do not establish missing files, a missing release or complete coverage.

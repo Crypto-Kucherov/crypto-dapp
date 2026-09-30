@@ -311,3 +311,22 @@ test('escapes Markdown and rejects dangerous report links', async () => {
   for (const unexpected of ['<script>', '<img', 'javascript:', '\n# forged heading']) assert.ok(!markdown.includes(unexpected));
   assert.ok(markdown.includes('repo\\|&lt;script&gt;'));
 });
+
+test('repeated repository and commit records remain usable without inflating counts', async () => {
+  const repeated = repository('tool', { id: 42 });
+  const { client, seen } = fixtureClient({ repos: [repeated], override: url => {
+    if (url.pathname.endsWith('/repos')) return Response.json([repeated], url.searchParams.get('page') === '1'
+      ? { headers: { link: '<https://api.github.com/next>; rel="next"' } } : {});
+    if (url.pathname.endsWith('/commits')) return Response.json([{ sha: 'one' }, { sha: 'one' }, { sha: 'two' }]);
+  } });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.repositories.length, 1);
+  assert.equal(report.scope.listedRepositories, 1);
+  assert.equal(report.scope.inspectedRepositories, 1);
+  assert.equal(report.scope.repositoryListComplete, false);
+  assert.deepEqual(report.repositories[0].commits, { count: 2, complete: false });
+  assert.equal(seen.filter(url => url.pathname.includes('/git/trees/')).length, 1);
+  assert.ok(report.warnings.some(warning => /Repeated records/.test(warning)));
+  const { validateProfileReport } = await import('../src/snapshot.js');
+  assert.equal(validateProfileReport(report), report);
+});

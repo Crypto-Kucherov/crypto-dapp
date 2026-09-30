@@ -113,7 +113,7 @@ async function inspectRepository(client, repo, username, since, until) {
   }
   try {
     const params = new URLSearchParams({ author: username, sha: repo.default_branch, since, until });
-    const commits = await client.paginate(`${base}/commits?${params}`, { maxPages: 3 });
+    const commits = await client.paginate(`${base}/commits?${params}`, { maxPages: 3, itemKeys: commit => [commit.sha] });
     result.commits = { count: commits.items.length, complete: commits.complete };
     if (commits.warning) result.warnings.push(`Commit count: ${commits.warning}`);
   } catch (error) {
@@ -165,7 +165,9 @@ export async function analyzeProfile(client, username, { since: sinceInput, unti
   const { data: profile } = await client.get(`/users/${encodeURIComponent(username)}`);
   if (profile.type !== 'User') throw new Error('This tool reports on personal GitHub accounts, not organizations.');
   username = validateUsername(profile.login);
-  const listing = await client.paginate(`/users/${encodeURIComponent(username)}/repos?type=owner&sort=pushed&direction=desc`);
+  const listing = await client.paginate(`/users/${encodeURIComponent(username)}/repos?type=owner&sort=pushed&direction=desc`, {
+    itemKeys: repo => [repo.name.toLowerCase(), ...(Number.isSafeInteger(repo.id) && repo.id > 0 ? [`id:${repo.id}`] : [])],
+  });
   // Filter explicitly even with a token: never include private repositories in an exported report.
   const publicRepos = listing.items.filter(repo => repo.private === false);
   const eligible = publicRepos.filter(repo => !repo.fork && !repo.archived);

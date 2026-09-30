@@ -91,24 +91,44 @@ export class GitHubClient {
     }
   }
 
-  async paginate(path, { maxPages = 10 } = {}) {
+  async paginate(path, { maxPages = 10, itemKeys } = {}) {
     const items = [];
+    const seen = new Set();
+    let repeated = false;
+    const finish = warning => {
+      const warnings = [repeated ? 'Repeated records were omitted; pagination may have skipped other records.' : null, warning].filter(Boolean);
+      return { items, complete: warnings.length === 0, warning: warnings.join(' ') || null };
+    };
     for (let page = 1; page <= maxPages; page++) {
       const params = new URL(path, API_ORIGIN);
       params.searchParams.set('per_page', '100');
       params.searchParams.set('page', String(page));
       let result;
+      let keys;
       try {
         result = await this.get(params.pathname + params.search);
         if (!Array.isArray(result.data)) throw new GitHubError('Unexpected GitHub list response.');
+        if (itemKeys) {
+          try {
+            keys = result.data.map(itemKeys);
+            if (!keys.every(values => Array.isArray(values) && values.length > 0
+              && values.every(key => typeof key === 'string' && key.length > 0))) throw new Error();
+          } catch { throw new GitHubError('Unexpected GitHub list entry identity.'); }
+        }
       } catch (error) {
         if (page === 1) throw error;
-        return { items, complete: false, warning: error.message };
+        return finish(error.message);
       }
-      items.push(...result.data);
+      for (const [index, item] of result.data.entries()) {
+        const identities = keys?.[index] || [];
+        const duplicate = identities.some(key => seen.has(key));
+        for (const key of identities) seen.add(key);
+        if (duplicate) repeated = true;
+        else items.push(item);
+      }
       const hasNext = /rel="next"/.test(result.headers.get('link') || '');
-      if (!hasNext) return { items, complete: true, warning: null };
+      if (!hasNext) return finish();
     }
-    return { items, complete: false, warning: `Stopped after ${maxPages} pages; counts are lower bounds.` };
+    return finish(`Stopped after ${maxPages} pages; counts are lower bounds.`);
   }
 }
