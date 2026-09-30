@@ -87,6 +87,7 @@ async function searchCount(client, query) {
 async function inspectRepository(client, repo, username, since, until) {
   const base = `/repos/${encodeURIComponent(username)}/${encodeURIComponent(repo.name)}`;
   const result = {
+    ...(Number.isSafeInteger(repo.id) && repo.id > 0 ? { id: repo.id } : {}),
     name: repo.name,
     url: repo.html_url,
     description: repo.description,
@@ -184,7 +185,8 @@ export async function analyzeProfile(client, username, { since: sinceInput, unti
     if (selectedNames.has(repo.name)) {
       repositories.push(await inspectRepository(client, repo, username, since, until));
     } else {
-      repositories.push({ name: repo.name, url: repo.html_url, description: repo.description,
+      repositories.push({ ...(Number.isSafeInteger(repo.id) && repo.id > 0 ? { id: repo.id } : {}),
+        name: repo.name, url: repo.html_url, description: repo.description,
         fork: repo.fork, archived: repo.archived, language: repo.language, stars: repo.stargazers_count,
         pushedAt: repo.pushed_at, inspected: false,
         skipReason: repo.fork ? 'fork' : repo.archived ? 'archived' : 'inspection limit' });

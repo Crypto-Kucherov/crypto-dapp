@@ -37,11 +37,17 @@ export function validateSnapshot(report, label = 'Snapshot') {
   for (const key of ACTIVITY) metric(report.activity[key], `activity.${key}`);
   require(Array.isArray(report.repositories), 'repositories must be an array.');
   const names = new Set();
+  const ids = new Set();
   for (const repo of report.repositories) {
     require(isObject(repo) && typeof repo.name === 'string' && repo.name.length > 0, 'each repository needs a name.');
     const key = repo.name.toLowerCase();
     require(!names.has(key), 'duplicate repository names are ambiguous.');
     names.add(key);
+    if (repo.id !== undefined) {
+      require(isCount(repo.id) && repo.id > 0, 'repository ID must be a positive safe integer when present.');
+      require(!ids.has(repo.id), 'duplicate repository IDs are ambiguous.');
+      ids.add(repo.id);
+    }
     require(typeof repo.inspected === 'boolean' && typeof repo.fork === 'boolean' && typeof repo.archived === 'boolean', 'repository inspection, fork and archive flags are required.');
     warnings(repo.warnings, 'repository warnings');
     if (!repo.inspected) continue;
@@ -100,17 +106,30 @@ export function compareSnapshots(before, after, { now = new Date() } = {}) {
   for (const [key, value] of Object.entries(metrics)) if (!value.comparable) warnings.push(`${key}: ${value.reason}`);
   const oldRepos = new Map(before.repositories.map(repo => [repo.name.toLowerCase(), repo]));
   const newRepos = new Map(after.repositories.map(repo => [repo.name.toLowerCase(), repo]));
-  const listedOnlyAfter = after.repositories.filter(repo => !oldRepos.has(repo.name.toLowerCase())).map(repo => ({
+  const byId = repos => new Map(repos.filter(repo => repo.id !== undefined).map(repo => [repo.id, repo]));
+  const oldIds = byId(before.repositories), newIds = byId(after.repositories);
+  const find = (repo, names, ids) => ids.get(repo.id) || names.get(repo.name.toLowerCase());
+  const listedOnlyAfter = after.repositories.filter(repo => !find(repo, oldRepos, oldIds)).map(repo => ({
     name: repo.name, url: repo.url, absentFromOtherCompleteList: before.scope.repositoryListComplete,
   }));
-  const listedOnlyBefore = before.repositories.filter(repo => !newRepos.has(repo.name.toLowerCase())).map(repo => ({
+  const listedOnlyBefore = before.repositories.filter(repo => !find(repo, newRepos, newIds)).map(repo => ({
     name: repo.name, url: repo.url, absentFromOtherCompleteList: after.scope.repositoryListComplete,
   }));
   const compared = [];
   for (const repo of after.repositories) {
-    const old = oldRepos.get(repo.name.toLowerCase());
+    const old = find(repo, oldRepos, oldIds);
     if (!old || (!old.inspected && !repo.inspected)) continue;
     const result = { name: repo.name, url: repo.url, beforeInspected: old.inspected, afterInspected: repo.inspected };
+    if (old.id !== undefined && repo.id !== undefined && old.id !== repo.id) {
+      result.reason = 'Repository ID changed under the same name; these are different repositories, so their evidence is not compared.';
+      warnings.push(`${repo.name}: ${result.reason}`);
+      compared.push(result);
+      continue;
+    }
+    if (old.name.toLowerCase() !== repo.name.toLowerCase()) {
+      result.previousName = old.name;
+      warnings.push(`${repo.name}: renamed from ${old.name}; matched by GitHub repository ID.`);
+    }
     if (!old.inspected || !repo.inspected) {
       result.reason = 'Repository was not inspected in both snapshots; file and commit changes are unknown.';
       warnings.push(`${repo.name}: ${result.reason}`);
