@@ -1,11 +1,12 @@
 const API_ORIGIN = 'https://api.github.com';
 
 export class GitHubError extends Error {
-  constructor(message, { status = null, rateLimited = false } = {}) {
+  constructor(message, { status = null, rateLimited = false, emptyRepository = false } = {}) {
     super(message);
     this.name = 'GitHubError';
     this.status = status;
     this.rateLimited = rateLimited;
+    this.emptyRepository = emptyRepository;
   }
 }
 
@@ -55,6 +56,14 @@ export class GitHubClient {
       throw new GitHubError('Cannot reach GitHub. Check your connection or retry after a timeout.');
     }
     if (!response.ok) {
+      let apiMessage = '';
+      if (response.status === 409) {
+        try { apiMessage = (await response.json())?.message; } catch { /* Keep the generic HTTP error. */ }
+      }
+      // A conflict alone does not establish an empty repository. Do not echo
+      // response bodies, which can contain sensitive or untrusted content.
+      const emptyRepository = response.status === 409 && typeof apiMessage === 'string'
+        && /^Git Repository is empty\.?$/i.test(apiMessage.trim());
       const rateLimited = response.status === 429 || (response.status === 403
         && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')));
       if (rateLimited) {
@@ -73,7 +82,7 @@ export class GitHubClient {
         422: 'GitHub could not process this request.',
       };
       throw new GitHubError(messages[response.status] || `GitHub returned HTTP ${response.status}. Retry later.`,
-        { status: response.status });
+        { status: response.status, emptyRepository });
     }
     try {
       return { data: await response.json(), headers: response.headers };

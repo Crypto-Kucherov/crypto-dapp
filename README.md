@@ -179,6 +179,10 @@ Search counts must be nonnegative safe integers with explicit completeness metad
 Malformed file trees or latest-release payloads become **Unknown** with a warning;
 they do not establish missing files, a missing release or complete coverage.
 
+An explicit GitHub `409` response saying the repository is empty establishes
+zero commits and absent files. Other conflicts or unavailable trees remain
+unknown; an HTTP status alone does not prove an empty repository.
+
 File detection is a heuristic: a test file does not prove passing tests, and a
 workflow file does not prove successful CI. Nonstandard layouts may be missed.
 README detection checks the repository root, `.github/` and `docs/`, following

@@ -108,7 +108,8 @@ async function inspectRepository(client, repo, username, since, until) {
     result.checks = inspectTree(data, repo.license);
     if (data.truncated) result.warnings.push('File tree is truncated; missing files cannot be ruled out.');
   } catch (error) {
-    result.warnings.push(`File checks: ${error.message}`);
+    if (error.emptyRepository) result.checks = inspectTree({ tree: [], truncated: false });
+    else result.warnings.push(`File checks: ${error.message}`);
   }
   try {
     const params = new URLSearchParams({ author: username, sha: repo.default_branch, since, until });
@@ -116,8 +117,7 @@ async function inspectRepository(client, repo, username, since, until) {
     result.commits = { count: commits.items.length, complete: commits.complete };
     if (commits.warning) result.warnings.push(`Commit count: ${commits.warning}`);
   } catch (error) {
-    // 409 from this endpoint explicitly identifies a repository with no history.
-    if (error.status === 409) result.commits = { count: 0, complete: true };
+    if (error.emptyRepository) result.commits = { count: 0, complete: true };
     else result.warnings.push(`Commit count: ${error.message}`);
   }
   try {

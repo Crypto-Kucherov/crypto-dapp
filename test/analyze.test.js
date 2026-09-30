@@ -255,13 +255,28 @@ test('a truncated tree does not produce false missing-file advice', async () => 
   assert.match(report.repositories[0].warnings[0], /truncated/);
 });
 
-test('empty history is zero, inaccessible files stay unknown', async () => {
+test('explicitly empty repositories have complete absent-file and zero-commit evidence', async () => {
   const { client } = fixtureClient({ override: url => {
-    if (url.pathname.endsWith('/commits') || url.pathname.includes('/git/trees/')) return new Response('', { status: 409 });
+    if (url.pathname.endsWith('/commits') || url.pathname.includes('/git/trees/')) return Response.json({ message: 'Git Repository is empty.' }, { status: 409 });
   } });
   const report = await analyzeProfile(client, 'alice', { now: NOW });
   assert.deepEqual(report.repositories[0].commits, { count: 0, complete: true });
-  assert.equal(report.repositories[0].checks.readme, null);
+  assert.deepEqual(report.repositories[0].checks, {
+    readme: false, license: false, tests: false, ci: false, sourceFiles: 0, sourceFilesComplete: true,
+  });
+  assert.deepEqual(report.repositories[0].warnings, []);
+});
+
+test('generic conflicts and missing resources never establish an empty repository', async () => {
+  for (const status of [409, 404]) {
+    const { client } = fixtureClient({ override: url => {
+      if (url.pathname.endsWith('/commits') || url.pathname.includes('/git/trees/')) return new Response('', { status });
+    } });
+    const report = await analyzeProfile(client, 'alice', { now: NOW });
+    assert.deepEqual(report.repositories[0].commits, { count: null, complete: false });
+    assert.equal(report.repositories[0].checks.readme, null);
+    assert.equal(report.repositories[0].warnings.length, 2);
+  }
 });
 
 test('incomplete search counts are labelled and do not trigger zero-activity advice', async () => {
