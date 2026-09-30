@@ -119,6 +119,8 @@ node src/index.js --compare reports/before.json reports/after.json
 | Different starts, or an earlier end | Show both activity totals but suppress activity deltas |
 | Unknown/incomplete counts | Show evidence without inventing a numeric delta |
 | Different default branch | Suppress that repository’s commit delta |
+| Same name, different saved GitHub repository IDs | Suppress all repository evidence comparisons |
+| Renamed repository, same saved GitHub ID | Match the repository and explain the rename |
 | Different accounts, reversed snapshots, unsupported schema, malformed data | Exit with an error |
 
 An expanded-window delta is not a count of newly authored work: indexing, history
@@ -131,6 +133,10 @@ the contents of saved snapshots. Use exported profile JSON with `schemaVersion: 
 including existing v0.1 reports. Comparison JSON has `kind: "comparison"` and cannot
 itself be used as an input profile snapshot. Interpretation warnings go to stderr
 and are included in the output; successful comparisons return exit code 0.
+
+New reports retain GitHub repository IDs. Older snapshots without IDs remain
+supported by matching names, but cannot distinguish a repository recreated under
+the same name. A present ID must be a positive safe integer and unique in its list.
 
 ## What it reports
 

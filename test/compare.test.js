@@ -254,3 +254,67 @@ test('invalid JSON and missing input fail without printing snapshot contents', a
     assert.match(missing.text.stderr, /ENOENT/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('different repository IDs under the same name suppress all repository deltas', async () => {
+  const { before, after } = pair();
+  repo(before).id = 100;
+  repo(after).id = 200;
+  repo(after).commits.count = 1000;
+  repo(after).checks.tests = true;
+  const result = compareSnapshots(before, after);
+  const changed = result.repositoryChanges.compared[0];
+  assert.match(changed.reason, /different repositories/);
+  for (const field of ['commits', 'checks', 'sourceFiles', 'release']) assert.equal(changed[field], undefined);
+  assert.equal(result.metrics.pullRequests.delta, 0);
+  assert.match(renderComparison(result), /Repository ID changed/);
+  const { renderHtml } = await import('../src/html.js');
+  assert.match(renderHtml(result), /Repository ID changed/);
+});
+
+test('renamed repositories with stable IDs retain comparisons and explain the match', () => {
+  const { before, after } = pair();
+  const newer = repo(after);
+  repo(before).id = newer.id = 100;
+  newer.name = 'renamed-tool';
+  newer.commits.count += 2;
+  const result = compareSnapshots(before, after);
+  assert.deepEqual(result.repositoryChanges.listedOnlyAfter, []);
+  assert.deepEqual(result.repositoryChanges.listedOnlyBefore, []);
+  assert.equal(result.repositoryChanges.compared[0].previousName, 'crypto-dapp');
+  assert.equal(result.repositoryChanges.compared[0].commits.delta, 2);
+  assert.ok(result.warnings.some(warning => /matched by GitHub repository ID/.test(warning)));
+});
+
+test('ID matches take precedence when another repository reuses the old name', () => {
+  const { before, after } = pair();
+  repo(before).id = 100;
+  const renamed = repo(after);
+  renamed.id = 100;
+  renamed.name = 'new-name';
+  after.repositories.push({ ...structuredClone(renamed), id: 200, name: 'crypto-dapp' });
+  const result = compareSnapshots(before, after);
+  const compared = result.repositoryChanges.compared;
+  assert.equal(compared.find(item => item.name === 'new-name').commits.delta, 0);
+  assert.match(compared.find(item => item.name === 'crypto-dapp').reason, /ID changed/);
+});
+
+test('legacy snapshots without IDs still compare by name', () => {
+  for (const withId of ['before', 'after', 'neither']) {
+    const snapshots = pair();
+    if (withId !== 'neither') repo(snapshots[withId]).id = 100;
+    const result = compareSnapshots(snapshots.before, snapshots.after);
+    assert.equal(result.repositoryChanges.compared[0].commits.delta, 0);
+    assert.equal(result.repositoryChanges.compared[0].reason, undefined);
+  }
+});
+
+test('invalid and duplicate saved repository IDs are rejected', () => {
+  for (const id of [null, '100', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const report = snapshot();
+    repo(report).id = id;
+    assert.throws(() => validateSnapshot(report), /repository ID/);
+  }
+  const report = snapshot();
+  for (const item of report.repositories) item.id = 100;
+  assert.throws(() => validateSnapshot(report), /duplicate repository IDs/);
+});

@@ -330,3 +330,9 @@ test('repeated repository and commit records remain usable without inflating cou
   const { validateProfileReport } = await import('../src/snapshot.js');
   assert.equal(validateProfileReport(report), report);
 });
+
+test('collection preserves stable IDs for inspected and intentionally skipped repositories', async () => {
+  const { client } = fixtureClient({ repos: [repository('tool', { id: 11 }), repository('copy', { id: 12, fork: true })] });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.deepEqual(report.repositories.map(repo => repo.id), [11, 12]);
+});
