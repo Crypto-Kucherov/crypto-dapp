@@ -273,6 +273,16 @@ its existing behavior. Automation can distinguish:
 
 ## Development
 
+Check the installed version without contacting GitHub:
+
+```sh
+node src/index.js --version
+```
+
+`-v` is an alias. Run version diagnostics on their own, without collection or
+output flags. Include the version when reporting a bug; requests use the same
+package version in their User-Agent header.
+
 ```sh
 node --test
 node src/index.js --help

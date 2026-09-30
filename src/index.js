@@ -9,6 +9,7 @@ import { compareSnapshots, renderComparison } from './compare.js';
 import { renderHtml } from './html.js';
 import { readSnapshot, validateProfileReport } from './snapshot.js';
 import { hasIncompleteProfile } from './coverage.js';
+import { VERSION } from './version.js';
 
 const HELP = `GitHub Activity Report
 
@@ -26,6 +27,7 @@ Options:
   --from PROFILE.json    Render a saved profile offline without refreshing its data
   --fail-on-incomplete   Exit 2 after writing a profile with incomplete evidence
   --help                  Show this help
+  --version, -v           Show the installed version without GitHub requests
 
 Examples:
   node src/index.js Crypto-Kucherov
@@ -43,6 +45,7 @@ Exit codes: 0 report produced; 1 error; 2 incomplete profile with --fail-on-inco
 
 export function parseArgs(args) {
   if (args.includes('--help') || args.includes('-h')) return { help: true };
+  if (args.length === 1 && ['--version', '-v'].includes(args[0])) return { version: true };
   const options = { format: 'markdown', maxRepos: 10 };
   if (args[0] === '--compare') {
     if (!args[1] || !args[2] || args[1].startsWith('--') || args[2].startsWith('--')) {
@@ -97,6 +100,7 @@ export async function main(args = process.argv.slice(2), {
   try {
     const options = parseArgs(args);
     if (options.help) { stdout.write(HELP); return 0; }
+    if (options.version) { stdout.write(`${VERSION}\n`); return 0; }
     const target = options.out ? resolve(options.out) : null;
     if (target) {
       // Avoid spending API quota on a report that cannot be saved. lstat also
