@@ -126,3 +126,29 @@ test('invalid list identities fail safely and retain validated earlier pages', a
     }
   }
 });
+
+test('secondary-limit messages stop requests even without retry or quota headers', async () => {
+  for (const message of ['You have exceeded a secondary rate limit. PRIVATE_MARKER',
+    'You have triggered an abuse detection mechanism. PRIVATE_MARKER']) {
+    let calls = 0;
+    const client = new GitHubClient({ fetchImpl: async () => {
+      calls++;
+      return Response.json({ message }, { status: 403, headers: { 'x-ratelimit-remaining': '100' } });
+    } });
+    await assert.rejects(client.get('/users/alice'), error => error.rateLimited && !error.message.includes('PRIVATE_MARKER'));
+    await assert.rejects(client.get('/users/alice/repos'), /remaining checks were skipped/);
+    assert.equal(calls, 1);
+  }
+});
+
+test('ordinary forbidden responses do not suppress unrelated later requests', async () => {
+  for (const body of [null, { message: 'Resource not accessible by integration' }, { message: 42 }, 'not json']) {
+    let calls = 0;
+    const client = new GitHubClient({ fetchImpl: async () => ++calls === 1
+      ? (typeof body === 'string' ? new Response(body, { status: 403 }) : Response.json(body, { status: 403 }))
+      : Response.json({ ok: true }) });
+    await assert.rejects(client.get('/repos/a/b'), error => error.status === 403 && !error.rateLimited);
+    assert.deepEqual((await client.get('/users/alice')).data, { ok: true });
+    assert.equal(calls, 2);
+  }
+});

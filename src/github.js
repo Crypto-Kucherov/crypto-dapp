@@ -57,7 +57,7 @@ export class GitHubClient {
     }
     if (!response.ok) {
       let apiMessage = '';
-      if (response.status === 409) {
+      if (response.status === 403 || response.status === 409) {
         try { apiMessage = (await response.json())?.message; } catch { /* Keep the generic HTTP error. */ }
       }
       // A conflict alone does not establish an empty repository. Do not echo
@@ -65,7 +65,8 @@ export class GitHubClient {
       const emptyRepository = response.status === 409 && typeof apiMessage === 'string'
         && /^Git Repository is empty\.?$/i.test(apiMessage.trim());
       const rateLimited = response.status === 429 || (response.status === 403
-        && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')));
+        && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after')
+          || (typeof apiMessage === 'string' && /secondary rate limit|abuse detection/i.test(apiMessage))));
       if (rateLimited) {
         this.rateLimited = true;
         const reset = Number(response.headers.get('x-ratelimit-reset'));
