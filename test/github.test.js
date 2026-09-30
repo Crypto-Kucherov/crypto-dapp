@@ -76,3 +76,12 @@ test('handles secondary limits, authentication, timeout and invalid JSON without
   const invalid = new GitHubClient({ fetchImpl: async () => new Response('not json') });
   await assert.rejects(invalid.get('/users/a'), /invalid JSON/);
 });
+
+test('recognizes explicit empty-repository conflicts without reflecting response content', async () => {
+  for (const [message, expected] of [['Git Repository is empty.', true], ['Git Repository is empty', true],
+    ['Conflict PRIVATE_MARKER', false], [null, false], [{ empty: true }, false]]) {
+    const client = new GitHubClient({ fetchImpl: async () => Response.json({ message }, { status: 409 }) });
+    await assert.rejects(client.get('/repos/a/b/commits'), error =>
+      error.status === 409 && error.emptyRepository === expected && !error.message.includes('PRIVATE_MARKER'));
+  }
+});
