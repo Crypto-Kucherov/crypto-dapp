@@ -168,6 +168,72 @@ test('rejects different accounts and reversed chronological input', () => {
   assert.throws(() => compareSnapshots(before, after), /same GitHub account/);
 });
 
+test('matching account IDs allow renamed logins with an explicit warning', async () => {
+  const { before, after } = pair();
+  before.profile.id = after.profile.id = 123;
+  after.profile.login = 'renamed-account';
+  after.profile.url = 'https://github.com/renamed-account';
+  after.activity.pullRequests.count += 2;
+  const result = compareSnapshots(before, after);
+  assert.equal(result.profile.id, 123);
+  assert.equal(result.profile.login, 'renamed-account');
+  assert.equal(result.profile.previousLogin, before.profile.login);
+  assert.equal(result.metrics.pullRequests.delta, 2);
+  assert.equal(result.repositoryChanges.compared[0].commits.delta, 0);
+  assert.ok(result.warnings.some(warning => /Account renamed.*matched by GitHub account ID/.test(warning)));
+  assert.match(renderComparison(result), /Account renamed/);
+  const { renderHtml } = await import('../src/html.js');
+  assert.match(renderHtml(result), /Account renamed/);
+});
+
+test('different account IDs reject comparisons even when a login is reused', () => {
+  for (const login of ['Crypto-Kucherov', 'crypto-kucherov', 'someone-else']) {
+    const { before, after } = pair();
+    before.profile.id = 123;
+    after.profile.id = 456;
+    after.profile.login = login;
+    assert.throws(() => compareSnapshots(before, after), /different GitHub account IDs/);
+  }
+});
+
+test('legacy profile snapshots compare by login but cannot prove an account rename', () => {
+  for (const withId of ['before', 'after', 'neither']) {
+    const snapshots = pair();
+    if (withId !== 'neither') snapshots[withId].profile.id = 123;
+    snapshots.after.profile.login = snapshots.before.profile.login.toLowerCase();
+    const result = compareSnapshots(snapshots.before, snapshots.after);
+    assert.equal(result.metrics.pullRequests.delta, 0);
+    assert.equal(result.profile.previousLogin, undefined);
+    snapshots.after.profile.login = 'renamed-account';
+    assert.throws(() => compareSnapshots(snapshots.before, snapshots.after), /same GitHub account/);
+  }
+});
+
+test('present account IDs must be positive safe integers in saved snapshots', () => {
+  for (const id of [null, '123', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const report = snapshot();
+    report.profile.id = id;
+    assert.throws(() => validateSnapshot(report), /profile ID/);
+  }
+});
+
+test('offline CLI rejects a reused login without creating a comparison file', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'github-account-identity-'));
+  try {
+    const { before, after } = pair();
+    before.profile.id = 123;
+    after.profile.id = 456;
+    const older = join(dir, 'before.json'), newer = join(dir, 'after.json'), output = join(dir, 'comparison.json');
+    await writeFile(older, JSON.stringify(before));
+    await writeFile(newer, JSON.stringify(after));
+    const { text, options } = capture();
+    assert.equal(await main(['--compare', older, newer, '--format', 'json', '--out', output], options), 1);
+    assert.equal(text.stdout, '');
+    assert.match(text.stderr, /different GitHub account IDs/);
+    await assert.rejects(readFile(output), { code: 'ENOENT' });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test('rejects unknown schemas, impossible dates, invalid counts and ambiguous repositories', () => {
   const edits = [
     r => { r.schemaVersion = 2; },

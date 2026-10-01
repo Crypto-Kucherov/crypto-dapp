@@ -165,6 +165,7 @@ export async function analyzeProfile(client, username, { since: sinceInput, unti
   if (Date.parse(since) > Date.parse(until)) throw new Error('--since must be on or before --until.');
   const { data: profile } = await client.get(`/users/${encodeURIComponent(username)}`);
   if (profile.type !== 'User') throw new Error('This tool reports on personal GitHub accounts, not organizations.');
+  if (!Number.isSafeInteger(profile.id) || profile.id <= 0) throw new GitHubError('Unexpected GitHub profile ID.');
   username = validateUsername(profile.login);
   const listing = await client.paginate(`/users/${encodeURIComponent(username)}/repos?type=owner&sort=pushed&direction=desc`, {
     itemKeys: repo => [repo.name.toLowerCase(), ...(Number.isSafeInteger(repo.id) && repo.id > 0 ? [`id:${repo.id}`] : [])],
@@ -199,7 +200,7 @@ export async function analyzeProfile(client, username, { since: sinceInput, unti
   const report = {
     schemaVersion: 1,
     generatedAt: now.toISOString(),
-    profile: { login: username, name: profile.name, url: profile.html_url, bio: profile.bio,
+    profile: { id: profile.id, login: username, name: profile.name, url: profile.html_url, bio: profile.bio,
       createdAt: profile.created_at, publicRepositories: profile.public_repos,
       followers: profile.followers, following: profile.following },
     scope: { publicOnly: true, since, until, repositoryListComplete: listing.complete,
