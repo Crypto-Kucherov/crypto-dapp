@@ -25,6 +25,9 @@ export function validateSnapshot(report, label = 'Snapshot') {
   require(isObject(report) && report.schemaVersion === 1 && report.kind !== 'comparison', 'expected a profile snapshot with schemaVersion 1.');
   require(isObject(report.profile), 'profile is missing.');
   try { validateUsername(report.profile.login); } catch { throw new Error(`${label}: invalid profile login.`); }
+  if (report.profile.id !== undefined) {
+    require(isCount(report.profile.id) && report.profile.id > 0, 'profile ID must be a positive safe integer when present.');
+  }
   require(isCount(report.profile.publicRepositories), 'public repository count is missing or invalid.');
   require(isObject(report.scope) && report.scope.publicOnly === true, 'expected public-only coverage metadata.');
   require(typeof report.scope.repositoryListComplete === 'boolean', 'repository listing completeness is missing.');
@@ -82,7 +85,11 @@ function compareValue(before, after) {
 export function compareSnapshots(before, after, { now = new Date() } = {}) {
   validateSnapshot(before, 'Before snapshot');
   validateSnapshot(after, 'After snapshot');
-  if (before.profile.login.toLowerCase() !== after.profile.login.toLowerCase()) throw new Error('Both snapshots must belong to the same GitHub account.');
+  const sameLogin = before.profile.login.toLowerCase() === after.profile.login.toLowerCase();
+  const bothHaveIds = before.profile.id !== undefined && after.profile.id !== undefined;
+  if (bothHaveIds) {
+    if (before.profile.id !== after.profile.id) throw new Error('Snapshots have different GitHub account IDs; they belong to different accounts.');
+  } else if (!sameLogin) throw new Error('Both snapshots must belong to the same GitHub account; matching IDs are required to compare different logins.');
   if (new Date(before.generatedAt) > new Date(after.generatedAt)) throw new Error('The first snapshot must be older than or equal to the second snapshot.');
   const sameStart = Date.parse(before.scope.since) === Date.parse(after.scope.since);
   const sameEnd = Date.parse(before.scope.until) === Date.parse(after.scope.until);
@@ -90,6 +97,7 @@ export function compareSnapshots(before, after, { now = new Date() } = {}) {
     : sameStart && Date.parse(after.scope.until) > Date.parse(before.scope.until) ? 'expanded' : 'different';
   const windowReason = windowKind === 'different' ? 'Activity windows differ; these totals cannot establish new activity.' : null;
   const warnings = [];
+  if (!sameLogin) warnings.push(`Account renamed from ${before.profile.login} to ${after.profile.login}; matched by GitHub account ID.`);
   if (windowKind === 'expanded') warnings.push('The activity window expanded with the same start date. Deltas are net count changes, not proof of newly authored work.');
   if (windowReason) warnings.push(windowReason);
   if (!before.scope.repositoryListComplete || !after.scope.repositoryListComplete) warnings.push('A repository list is incomplete. An omitted repository may simply be outside the fetched pages.');
@@ -160,12 +168,15 @@ export function compareSnapshots(before, after, { now = new Date() } = {}) {
     until: snapshot.scope.until, repositoryListComplete: snapshot.scope.repositoryListComplete, maxRepos: snapshot.scope.maxRepos });
   return {
     schemaVersion: 1, kind: 'comparison', generatedAt: now.toISOString(),
-    profile: { login: after.profile.login, url: after.profile.url },
+    profile: { ...(after.profile.id !== undefined ? { id: after.profile.id } : {}),
+      login: after.profile.login, url: after.profile.url,
+      ...(!sameLogin ? { previousLogin: before.profile.login } : {}) },
     before: snapshotSummary(before), after: snapshotSummary(after), windowKind,
     metrics, repositoryChanges: { listedOnlyAfter, listedOnlyBefore, compared },
     warnings: [...new Set(warnings)],
     limitations: [
       'This offline comparison describes saved public GitHub evidence, not Legion Score or developer quality.',
+      'When either snapshot lacks an account ID, account matching falls back to the login and cannot detect a reused username.',
       'Counts are net snapshot differences. Search indexing, rewritten history and changed visibility can affect them; a negative difference does not prove lost contributions.',
       'Repositories listed in only one snapshot may be renamed, transferred, made private or omitted from incomplete pages; this is not proof of creation or deletion.',
       'File and release checks describe each snapshot’s repository state. Test and CI paths do not establish passing tests or successful runs.',

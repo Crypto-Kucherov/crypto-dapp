@@ -147,6 +147,8 @@ node src/index.js --compare reports/before.json reports/after.json
 | Different default branch | Suppress that repository’s commit delta |
 | Same name, different saved GitHub repository IDs | Suppress all repository evidence comparisons |
 | Renamed repository, same saved GitHub ID | Match the repository and explain the rename |
+| Renamed account, same saved GitHub account ID | Compare snapshots and explain the previous login |
+| Different saved GitHub account IDs, including under the same login | Reject the comparison |
 | Different accounts, reversed snapshots, unsupported schema, malformed data | Exit with an error |
 
 An expanded-window delta is not a count of newly authored work: indexing, history
@@ -163,6 +165,15 @@ and are included in the output; successful comparisons return exit code 0.
 New reports retain GitHub repository IDs. Older snapshots without IDs remain
 supported by matching names, but cannot distinguish a repository recreated under
 the same name. A present ID must be a positive safe integer and unique in its list.
+
+New profile exports also retain the numeric account ID from GitHub's public user
+response. GitHub describes this as a [durable ID independent of the login](https://docs.github.com/en/rest/users/users#get-a-user-using-their-id).
+Matching account IDs allow comparison after a username change, with a visible
+rename warning. Different IDs reject the comparison even if the login is unchanged.
+If either older snapshot lacks an account ID, both logins must still match
+(ignoring case); that fallback cannot detect a username reused by another account.
+A present account ID must be a positive safe integer. Collection rejects a missing
+or malformed API account ID before requesting repositories or activity.
 
 ## What it reports
 

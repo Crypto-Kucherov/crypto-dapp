@@ -9,7 +9,7 @@ import { main, parseArgs } from '../src/index.js';
 
 function publicClient() {
   return new GitHubClient({ fetchImpl: async url => {
-    if (url.pathname === '/users/alice') return Response.json({ login: 'alice', type: 'User', name: 'Alice',
+    if (url.pathname === '/users/alice') return Response.json({ id: 123, login: 'alice', type: 'User', name: 'Alice',
       html_url: 'https://github.com/alice', public_repos: 0, created_at: '2023-01-01T00:00:00Z' });
     if (url.pathname.endsWith('/repos')) return Response.json([]);
     if (url.pathname === '/search/issues') return Response.json({ total_count: 0, incomplete_results: false });

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { GitHubClient } from '../src/github.js';
 import { analyzeProfile, inspectTree, parseSince, parseUntil } from '../src/analyze.js';
 import { renderMarkdown } from '../src/report.js';
+import { validateProfileReport } from '../src/snapshot.js';
 
 const NOW = new Date('2026-09-27T12:00:00.000Z');
 const repository = (name, extra = {}) => ({ name, private: false, fork: false, archived: false,
@@ -16,7 +17,7 @@ function fixtureClient({ repos = [repository('tool')], override } = {}) {
     seen.push(url);
     const overridden = await override?.(url, options);
     if (overridden) return overridden;
-    if (url.pathname === '/users/alice') return Response.json({ login: 'alice', type: 'User', name: 'Alice',
+    if (url.pathname === '/users/alice') return Response.json({ id: 123, login: 'alice', type: 'User', name: 'Alice',
       bio: 'Builds tools', created_at: '2023-07-12T12:00:00Z', public_repos: repos.filter(repo => !repo.private).length,
       html_url: 'https://github.com/alice', followers: 2, following: 3 });
     if (url.pathname === '/users/alice/repos') return Response.json(repos);
@@ -33,6 +34,22 @@ test('calendar validation rejects rollover dates and future dates', () => {
   assert.equal(parseSince('2024-02-29', NOW), '2024-02-29T00:00:00.000Z');
   assert.equal(parseSince(undefined, NOW), '2026-06-29T12:00:00.000Z');
   for (const value of ['2026-02-29', '2026-02-30', '2026-13-01', '2026-09-28', 'yesterday', '2026-9-2']) assert.throws(() => parseSince(value, NOW));
+});
+
+test('collection saves the public account ID in a valid reusable snapshot', async () => {
+  const { client } = fixtureClient();
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.profile.id, 123);
+  assert.equal(validateProfileReport(JSON.parse(JSON.stringify(report))).profile.id, 123);
+});
+
+test('invalid API account IDs stop collection before further requests', async () => {
+  for (const id of [undefined, null, '123', 0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1]) {
+    const { client, seen } = fixtureClient({ override: url => url.pathname === '/users/alice'
+      ? Response.json({ id, login: 'alice', type: 'User' }) : undefined });
+    await assert.rejects(analyzeProfile(client, 'alice', { now: NOW }), /profile ID/);
+    assert.equal(seen.length, 1);
+  }
 });
 
 test('end dates include a full past UTC day but never future time', () => {
