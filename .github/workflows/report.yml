@@ -1,0 +1,78 @@
+name: Generate profile report
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: Public GitHub username to report on
+        required: true
+        default: Crypto-Kucherov
+        type: string
+      since:
+        description: Start date, YYYY-MM-DD (blank = 90 days before end)
+        type: string
+      until:
+        description: Inclusive end date, YYYY-MM-DD (blank = now)
+        type: string
+      max_repos:
+        description: Maximum active original repositories to inspect
+        required: true
+        default: '10'
+        type: choice
+        options:
+          - '5'
+          - '10'
+          - '25'
+          - '50'
+      fail_on_incomplete:
+        description: Fail the run if evidence is incomplete (reports are kept)
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Collect one public-data snapshot
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPORT_USERNAME: ${{ inputs.username }}
+          REPORT_SINCE: ${{ inputs.since }}
+          REPORT_UNTIL: ${{ inputs.until }}
+          REPORT_MAX_REPOS: ${{ inputs.max_repos }}
+        shell: bash
+        run: |
+          args=("$REPORT_USERNAME" --max-repos "$REPORT_MAX_REPOS" --format json --out reports/profile.json)
+          if [[ -n "$REPORT_SINCE" ]]; then args+=(--since "$REPORT_SINCE"); fi
+          if [[ -n "$REPORT_UNTIL" ]]; then args+=(--until "$REPORT_UNTIL"); fi
+          node src/index.js "${args[@]}"
+      - name: Render the saved snapshot offline
+        run: |
+          node src/index.js --from reports/profile.json --format markdown --out reports/profile.md
+          node src/index.js --from reports/profile.json --format html --out reports/profile.html
+      - name: Show the report in the run summary
+        run: cat reports/profile.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Save downloadable reports
+        uses: actions/upload-artifact@v7
+        with:
+          name: github-profile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            reports/profile.json
+            reports/profile.md
+            reports/profile.html
+          if-no-files-found: error
+          retention-days: 7
+      # Run this after uploading so partial evidence remains available to inspect.
+      - name: Check evidence completeness
+        if: ${{ inputs.fail_on_incomplete }}
+        run: node src/index.js --from reports/profile.json --fail-on-incomplete > /dev/null
