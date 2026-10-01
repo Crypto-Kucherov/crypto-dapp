@@ -10,6 +10,32 @@ their public developer portfolio actually demonstrates.
 Legion Score, token-sale allocations, or investment returns.** There is no
 proprietary scoring formula or artificial contribution generator here.
 
+## Run on GitHub without installing Node.js
+
+Repository owners and collaborators with write access can generate a report from
+[Actions → Generate profile report](https://github.com/Crypto-Kucherov/crypto-dapp/actions/workflows/report.yml):
+
+1. Select **Run workflow**, keep `main`, and enter a public GitHub username.
+2. Optionally set UTC start/end dates and the repository inspection limit.
+3. Run the workflow, then open the completed run to read its report summary.
+4. Download the `github-profile-…` artifact for the JSON, Markdown and standalone
+   HTML files. Extract the ZIP and open `profile.html` in your browser.
+
+Other users can fork this repository, enable Actions in their fork, and follow
+the same steps there. The workflow runs only when requested; it has no schedule.
+It uses GitHub's automatic read-only token, so no personal token or other secret
+needs to be configured. Only public profile data is collected.
+
+All three files come from one snapshot, with the same collection time. By default,
+incomplete evidence marks the run as failed **after** the reports are uploaded, so
+you can still inspect warnings. Uncheck `fail_on_incomplete` to allow partial data.
+An invalid input or an error that prevents collection produces no report artifact.
+
+Reports and run summaries in a public repository are publicly accessible; GitHub
+requires sign-in to download artifacts. Artifacts are retained for **7 days**, so
+download the JSON if you want to keep it for a later comparison. Reports are not
+committed to the repository.
+
 ## Quick start
 
 Requires **Node.js 22 or newer**. No packages, API keys, wallet, or installation
