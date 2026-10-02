@@ -267,11 +267,15 @@ generated/dependency-folder exclusions apply to both source counting and test ch
 | JavaScript / TypeScript | `parser.test.js`, `widget.spec.tsx`, `parser-test.mjs` |
 | Python | `test_parser.py`, `parser_test.py` |
 | Go / Rust | `parser_test.go`, `parser_test.rs` |
+| C / C++ | `parser_test.cc`, `test_parser.cpp`, `codec.test.cxx`, `parser-test.c` |
 | Ruby / Elixir | `parser_test.rb`, `parser_spec.rb`, `parser_test.exs` |
 | Solidity | `Vault.t.sol` |
 | Java / Kotlin / C# / PHP | `UserTest.java`, `UserTests.kt`, `CalculatorTests.cs`, `UserTest.php`, `TestAccount.java` |
 
 Class-style `Test` / `Tests` suffixes and the `Test` prefix are case-sensitive.
+C/C++ source counting includes `c`, `cc`, `cpp`, `cxx` and headers `h`, `hh`,
+`hpp`, `hxx`. The native filename test patterns above apply to source extensions,
+while recognized source/header files inside test directories also count as test-path evidence.
 The prefix must be followed by an uppercase letter, digit or underscore to avoid
 matching names such as `Testament.cs`. These are filename heuristics, so helper
 code may also match; inline tests and nonstandard layouts may be missed.

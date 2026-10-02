@@ -123,6 +123,31 @@ test('supports Go, colocated JS tests and Python test files', () => {
   for (const path of ['pkg/main_test.go', 'src/index.test.mjs', 'src/button.spec.tsx', 'test_parser.py']) assert.equal(inspectTree(tree([path])).tests, true, path);
 });
 
+test('C and C++ source, header and colocated test conventions are recognized', () => {
+  const paths = ['src/parser.cc', 'include/parser.hh', 'src/codec.cxx', 'include/codec.hxx'];
+  assert.equal(inspectTree(tree(paths)).sourceFiles, 4);
+  assert.equal(inspectTree(tree(paths)).tests, false);
+  for (const path of ['src/parser_test.cc', 'src/codec.test.cxx', 'src/test_parser.cpp',
+    'src/parser-test.c', 'tests/parser.cc', 'spec/parser.cxx']) {
+    assert.equal(inspectTree(tree([path])).tests, true, path);
+    assert.equal(inspectTree(tree([path])).sourceFiles, 1, path);
+  }
+  for (const path of ['src/contest.cc', 'src/latest.cxx', 'docs/parser_test.cc.md',
+    'src/test_parser.cpp.o', 'vendor/tests/parser.cc']) {
+    assert.equal(inspectTree(tree([path])).tests, false, path);
+    assert.equal(inspectTree(tree([path], true)).tests, null, path);
+  }
+});
+
+test('C++ projects with colocated tests do not receive missing-test advice', async () => {
+  const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/')
+    ? Response.json(tree(['README.md', 'src/parser.cc', 'include/parser.hh', 'src/parser_test.cc'])) : undefined });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.repositories[0].checks.sourceFiles, 3);
+  assert.equal(report.repositories[0].checks.tests, true);
+  assert.ok(!report.recommendations.some(tip => tip.includes('add tests')));
+});
+
 test('recognizes README files in GitHub repository overview locations', () => {
   for (const path of ['README.md', '.github/README.md', 'docs/readme.rst', 'docs/README', '.github/readme.txt']) {
     assert.equal(inspectTree(tree([path])).readme, true, path);
