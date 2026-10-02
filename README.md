@@ -61,6 +61,11 @@ An existing output path is rejected before any GitHub requests, preserving API q
 The final write also refuses replacement if another process creates that file during collection.
 Without `--out`, the report goes to stdout; diagnostics go to stderr.
 
+Without an explicit `--format`, an output filename ending in `.json` selects JSON;
+`.html` or `.htm` selects HTML (case-insensitive). Other extensions and stdout
+default to Markdown. An explicit `--format` always wins, regardless of argument
+order. This applies to collection, `--from` and `--compare`.
+
 ## Open a report in your browser
 
 Use `--format html --out reports/profile.html`, then open that file in your browser.
@@ -100,7 +105,8 @@ warnings and suggestions stay as saved. In particular, `apiRequests` describes t
 original collection, not this offline conversion. A message on stderr identifies
 the saved-data mode; stdout contains only the report.
 
-`--from` accepts `--format`, `--out` and `--fail-on-incomplete`, with Markdown as the default.
+`--from` accepts `--format`, `--out` and `--fail-on-incomplete`. Without an explicit
+format it uses the output extension when recognized, otherwise Markdown.
 It cannot be combined with a username, `--compare`, `--since`, `--until` or `--max-repos`.
 Invalid JSON, unsupported schemas and inconsistent coverage fail before rendering.
 UTF-8 JSON files saved with a leading byte order mark (BOM) are supported in both
@@ -282,10 +288,11 @@ generated/dependency-folder exclusions apply to both source counting and test ch
 | Solidity | `Vault.t.sol` |
 | Java / Kotlin / C# / PHP | `UserTest.java`, `UserTests.kt`, `CalculatorTests.cs`, `UserTest.php`, `TestAccount.java` |
 
-Class-style `Test` / `Tests` suffixes and the `Test` prefix are case-sensitive.
 C/C++ source counting includes `c`, `cc`, `cpp`, `cxx` and headers `h`, `hh`,
 `hpp`, `hxx`. The native filename test patterns above apply to source extensions,
 while recognized source/header files inside test directories also count as test-path evidence.
+
+Class-style `Test` / `Tests` suffixes and the `Test` prefix are case-sensitive.
 The prefix must be followed by an uppercase letter, digit or underscore to avoid
 matching names such as `Testament.cs`. These are filename heuristics, so helper
 code may also match; inline tests and nonstandard layouts may be missed.

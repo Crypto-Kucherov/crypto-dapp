@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { lstat, mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { dirname, extname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { GitHubClient, validateUsername } from './github.js';
 import { analyzeProfile } from './analyze.js';
@@ -18,7 +18,7 @@ Usage: node src/index.js USERNAME [options]
        node src/index.js --compare BEFORE.json AFTER.json [--format markdown|json|html] [--out PATH]
 
 Options:
-  --format markdown|json|html  Output format (default: markdown)
+  --format markdown|json|html  Output format (default: inferred from --out, else markdown)
   --out PATH              Save to a new file instead of stdout
   --since YYYY-MM-DD       Activity start date, UTC (default: 90 days before end)
   --until YYYY-MM-DD       Inclusive activity end date, UTC (default: now)
@@ -95,6 +95,9 @@ export function parseArgs(args) {
     }
   }
   if (!options.compare && !options.from && !options.username) throw new Error('A GitHub username is required. Use --help for examples.');
+  if (!seen.has('--format') && options.out) {
+    options.format = { '.json': 'json', '.html': 'html', '.htm': 'html' }[extname(options.out).toLowerCase()] || 'markdown';
+  }
   if (!['markdown', 'json', 'html'].includes(options.format)) throw new Error('--format must be markdown, json or html.');
   if (options.maxRepos < 1 || options.maxRepos > 50) throw new Error('--max-repos must be an integer from 1 to 50.');
   return options;
