@@ -23,6 +23,7 @@ Options:
   --since YYYY-MM-DD       Activity start date, UTC (default: 90 days before end)
   --until YYYY-MM-DD       Inclusive activity end date, UTC (default: now)
   --max-repos N           Inspect 1–50 active original repos (default: 10)
+  --timeout SECONDS       Per-request timeout, 1–120 seconds (default: 15)
   --compare BEFORE AFTER Compare two saved JSON snapshots offline (no token needed)
   --from PROFILE.json    Render a saved profile offline without refreshing its data
   --fail-on-incomplete   Exit 2 after writing a profile with incomplete evidence
@@ -46,7 +47,7 @@ Exit codes: 0 report produced; 1 error; 2 incomplete profile with --fail-on-inco
 export function parseArgs(args) {
   if (args.includes('--help') || args.includes('-h')) return { help: true };
   if (args.length === 1 && ['--version', '-v'].includes(args[0])) return { version: true };
-  const options = { format: 'markdown', maxRepos: 10 };
+  const options = { format: 'markdown', maxRepos: 10, timeoutSeconds: 15 };
   if (args[0] === '--compare') {
     if (!args[1] || !args[2] || args[1].startsWith('--') || args[2].startsWith('--')) {
       throw new Error('--compare requires two JSON snapshot paths: BEFORE AFTER.');
@@ -68,7 +69,8 @@ export function parseArgs(args) {
       options.username = validateUsername(arg);
       continue;
     }
-    if (!['--format', '--out', '--since', '--until', '--max-repos', '--fail-on-incomplete'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
+    if (!['--format', '--out', '--since', '--until', '--max-repos', '--timeout', '--fail-on-incomplete'].includes(arg)) throw new Error(`Unknown option: ${arg}`);
+    if ((options.compare || options.from) && arg === '--timeout') throw new Error('--timeout applies only to live collection.');
     if ((options.compare || options.from) && ['--since', '--until', '--max-repos'].includes(arg)) throw new Error(`${arg} cannot change the coverage of saved snapshots.`);
     if (seen.has(arg)) throw new Error(`Duplicate option: ${arg}`);
     seen.add(arg);
@@ -83,6 +85,10 @@ export function parseArgs(args) {
     if (arg === '--out') options.out = value;
     if (arg === '--since') options.since = value;
     if (arg === '--until') options.until = value;
+    if (arg === '--timeout') {
+      if (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 120) throw new Error('--timeout must be an integer from 1 to 120 seconds.');
+      options.timeoutSeconds = Number(value);
+    }
     if (arg === '--max-repos') {
       if (!/^\d+$/.test(value)) throw new Error('--max-repos must be an integer from 1 to 50.');
       options.maxRepos = Number(value);
@@ -121,7 +127,7 @@ export async function main(args = process.argv.slice(2), {
       report = validateProfileReport(await readSnapshot(options.from));
       stderr.write('Using a saved snapshot; no new GitHub data was fetched.\n');
     } else {
-      const github = client || new GitHubClient({ token: process.env.GITHUB_TOKEN || '' });
+      const github = client || new GitHubClient({ token: process.env.GITHUB_TOKEN || '', timeoutMs: options.timeoutSeconds * 1000 });
       report = await analyzeProfile(github, options.username, options);
     }
     const output = options.format === 'json' ? `${JSON.stringify(report, null, 2)}\n`
