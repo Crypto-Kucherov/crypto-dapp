@@ -291,6 +291,9 @@ further requests and produces partial results if the profile and repo list are
 already available. Secondary-limit messages are recognized even when GitHub omits
 `Retry-After` and the primary quota is not exhausted. Ordinary permission errors
 do not suppress unrelated checks, and API response bodies are not copied to reports.
+An HTTP 401 stops further requests for that run because the credentials were rejected.
+Evidence collected earlier is retained, and skipped checks remain unknown. Fix the
+token and start a new run; the CLI does not silently switch authentication modes.
 Failure to obtain those basic inputs or invalid input returns
 exit code 1. Optional-check failures produce a report with coverage warnings and
 return 0 by default, or 2 with `--fail-on-incomplete`. Redirects are rejected, and tokens

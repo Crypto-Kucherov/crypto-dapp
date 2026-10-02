@@ -52,6 +52,19 @@ test('invalid API account IDs stop collection before further requests', async ()
   }
 });
 
+test('a token rejected during inspection preserves unknown evidence without more requests', async () => {
+  const { client, seen } = fixtureClient({
+    repos: [repository('tool'), repository('second')],
+    override: url => url.pathname.includes('/git/trees/') ? new Response('PRIVATE_MARKER', { status: 401 }) : undefined,
+  });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(client.requests, 6);
+  assert.equal(seen.filter(url => url.pathname.startsWith('/repos/')).length, 1);
+  assert.ok(report.repositories.every(item => item.checks.tests === null
+    && item.commits.count === null && item.release.status === 'unknown'));
+  assert.doesNotMatch(JSON.stringify(report), /PRIVATE_MARKER/);
+});
+
 test('end dates include a full past UTC day but never future time', () => {
   assert.equal(parseUntil(undefined, NOW), NOW.toISOString());
   assert.equal(parseUntil('2024-02-29', NOW), '2024-02-29T23:59:59.999Z');
