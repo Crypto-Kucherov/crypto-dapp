@@ -202,6 +202,8 @@ node src/index.js --compare examples/crypto-kucherov.json examples/crypto-kucher
 исходников. Поддерживаются, например, `Vault.t.sol`, `UserTest.java`,
 `CalculatorTests.cs`, `UserTest.php`, `parser_spec.rb` и `parser_test.exs`,
 а также ранее поддерживаемые имена JavaScript, TypeScript, Python и Go.
+Для C/C++ учитываются исходники `c/cc/cpp/cxx`, заголовки `h/hh/hpp/hxx`
+и тестовые имена вроде `parser_test.cc`, `test_parser.cpp`, `codec.test.cxx`.
 Это проверка имён, а не содержимого или результатов запуска: вспомогательный
 код тоже может совпасть с шаблоном, а встроенные в обычный файл тесты — остаться
 незамеченными. Полные шаблоны перечислены в [README](../README.md#recognized-test-paths).

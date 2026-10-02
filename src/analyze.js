@@ -2,7 +2,7 @@ import { GitHubError, validateUsername } from './github.js';
 
 const DAY = 86400000;
 const UNKNOWN_CHECKS = { readme: null, license: null, tests: null, ci: null, sourceFiles: null };
-const SOURCE_EXTENSION = /\.(?:[cm]?[jt]sx?|py|rs|go|sol|vy|java|kt|swift|c|h|cpp|hpp|cs|rb|php|ex|exs|sh|vue|svelte)$/i;
+const SOURCE_EXTENSION = /\.(?:[cm]?[jt]sx?|py|rs|go|sol|vy|java|kt|swift|c|h|cc|hh|cpp|hpp|cxx|hxx|cs|rb|php|ex|exs|sh|vue|svelte)$/i;
 
 function isTreeResponse(tree) {
   return tree !== null && typeof tree === 'object' && Array.isArray(tree.tree)
@@ -27,6 +27,7 @@ function isTestPath(path) {
   if (/(^|\/)(__tests__|tests?|specs?)\//i.test(path)) return true;
   const name = path.slice(path.lastIndexOf('/') + 1);
   return /^.+[.-](test|spec)\.[cm]?[jt]sx?$/i.test(name)
+    || /^(?:test_.+|.+(?:_test|[.-]test))\.(?:c|cc|cpp|cxx)$/i.test(name)
     || /^(?:test_.+\.py|.+_test\.(?:go|py|rs|rb|exs)|.+_spec\.rb|.+\.t\.sol)$/i.test(name)
     // Keep class-style test markers case-sensitive: Contest.php is not a test.
     || /^(?:Test[A-Z0-9_][\w.-]*|[\w.-]+Tests?)\.(?:java|kt|cs|php)$/.test(name);
