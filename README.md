@@ -102,6 +102,9 @@ It cannot be combined with a username, `--compare`, `--since`, `--until` or `--m
 Invalid JSON, unsupported schemas and inconsistent coverage fail before rendering.
 UTF-8 JSON files saved with a leading byte order mark (BOM) are supported in both
 offline modes; characters inside saved values remain unchanged.
+Snapshot inputs must resolve to regular files no larger than **20 MiB**. The reader
+also enforces this limit while reading a growing file. Directories and device or
+pipe inputs are rejected; symbolic links to regular files are supported.
 Existing files, including the source snapshot, are never overwritten.
 
 ## Compare saved snapshots
