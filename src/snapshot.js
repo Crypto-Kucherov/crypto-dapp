@@ -3,7 +3,9 @@ import { validateSnapshot } from './compare.js';
 
 export async function readSnapshot(path, label = 'Snapshot') {
   const text = await readFile(path, 'utf8');
-  try { return JSON.parse(text); }
+  // Some editors prepend a UTF-8 byte order mark. Strip only the leading mark,
+  // never characters inside saved values.
+  try { return JSON.parse(text.replace(/^\uFEFF/, '')); }
   catch { throw new Error(`${label} is not valid JSON.`); }
 }
 

@@ -135,3 +135,24 @@ test('bad JSON and missing files fail offline without reflecting file contents',
     }
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('UTF-8 BOM snapshots render and compare offline without changing saved text', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bom-snapshot-'));
+  try {
+    const report = snapshot();
+    report.profile.bio = 'Keep embedded \uFEFF text';
+    const file = join(dir, 'bom.json');
+    await writeFile(file, '\uFEFF' + JSON.stringify(report));
+    const rendered = capture();
+    assert.equal(await main(['--from', file, '--format', 'json'], rendered.options), 0);
+    assert.deepEqual(JSON.parse(rendered.output.stdout), report);
+    const compared = capture();
+    assert.equal(await main(['--compare', file, file, '--format', 'json'], compared.options), 0);
+    assert.equal(JSON.parse(compared.output.stdout).metrics.publicRepositories.delta, 0);
+    assert.equal(rendered.output.calls + compared.output.calls, 0);
+    await writeFile(file, '\uFEFF{PRIVATE_MARKER');
+    const invalid = capture();
+    assert.equal(await main(['--from', file], invalid.options), 1);
+    assert.doesNotMatch(invalid.output.stderr, /PRIVATE_MARKER/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
