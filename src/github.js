@@ -79,9 +79,16 @@ export class GitHubClient {
           || (typeof apiMessage === 'string' && /secondary rate limit|abuse detection/i.test(apiMessage))));
       if (rateLimited) {
         this.rateLimited = true;
-        const reset = Number(response.headers.get('x-ratelimit-reset'));
+        const retryHeader = response.headers.get('retry-after') || '';
+        const retrySeconds = /^\d+$/.test(retryHeader) ? Number(retryHeader) : NaN;
+        const resetHeader = response.headers.get('x-ratelimit-reset') || '';
+        const reset = /^\d+$/.test(resetHeader) ? Number(resetHeader) : NaN;
         const resetDate = new Date(reset * 1000);
-        const when = reset > 0 && Number.isFinite(resetDate.getTime()) ? ` Reset: ${resetDate.toISOString()}.` : '';
+        const when = Number.isSafeInteger(retrySeconds)
+          ? ` Retry after at least ${retrySeconds} seconds.`
+          : response.headers.get('x-ratelimit-remaining') === '0' && reset > 0 && Number.isFinite(resetDate.getTime())
+            ? ` Reset: ${resetDate.toISOString()}.`
+            : ' Wait at least 60 seconds before retrying.';
         throw new GitHubError(`GitHub rate limit reached.${when} Retry later; an optional GITHUB_TOKEN increases the primary limit.`,
           { status: response.status, rateLimited: true });
       }

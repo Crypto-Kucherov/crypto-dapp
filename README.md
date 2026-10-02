@@ -292,7 +292,11 @@ whole-run deadline and does not add retries. Offline modes reject the option.
 Detected rate limiting stops
 further requests and produces partial results if the profile and repo list are
 already available. Secondary-limit messages are recognized even when GitHub omits
-`Retry-After` and the primary quota is not exhausted. Ordinary permission errors
+`Retry-After` and the primary quota is not exhausted.
+`Retry-After` values expressed in whole seconds are shown before primary reset
+guidance. A primary reset time is shown only when its remaining quota is zero;
+otherwise the report advises waiting at least 60 seconds. The CLI never sleeps
+or automatically retries a rate-limited request. Ordinary permission errors
 do not suppress unrelated checks, and API response bodies are not copied to reports.
 An HTTP 401 stops further requests for that run because the credentials were rejected.
 Evidence collected earlier is retained, and skipped checks remain unknown. Fix the

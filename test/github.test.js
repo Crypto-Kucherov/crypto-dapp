@@ -190,3 +190,23 @@ test('configured timeout aborts an outstanding request and invalid durations are
   finally { clearTimeout(keepAlive); }
   assert.equal(client.requests, 1);
 });
+
+test('rate-limit guidance prioritizes Retry-After over the primary reset time', async () => {
+  for (const status of [403, 429]) {
+    const client = new GitHubClient({ fetchImpl: async () => new Response('', {
+      status, headers: { 'retry-after': '90', 'x-ratelimit-reset': '1800000000', 'x-ratelimit-remaining': '0' },
+    }) });
+    await assert.rejects(client.get('/users/alice'), error =>
+      error.rateLimited && /at least 90 seconds/.test(error.message) && !/Reset:/.test(error.message));
+  }
+});
+
+test('secondary limits do not claim the primary reset time or echo malformed headers', async () => {
+  for (const retry of ['', 'PRIVATE_MARKER', '-1', '1.5', '1e3', '999999999999999999999999']) {
+    const client = new GitHubClient({ fetchImpl: async () => Response.json({ message: 'secondary rate limit' }, {
+      status: 403, headers: { 'retry-after': retry, 'x-ratelimit-reset': '1800000000', 'x-ratelimit-remaining': '100' },
+    }) });
+    await assert.rejects(client.get('/users/alice'), error => error.rateLimited
+      && /at least 60 seconds/.test(error.message) && !/PRIVATE_MARKER|Reset:/.test(error.message));
+  }
+});
