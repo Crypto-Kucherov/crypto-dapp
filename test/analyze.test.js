@@ -142,6 +142,28 @@ test('a docs or .github README does not trigger missing-README advice', async ()
   }
 });
 
+test('GitHub-supported README markup formats are recognized only in overview locations', () => {
+  for (const extension of ['mdown', 'mkdn', 'textile', 'rdoc', 'org', 'creole', 'mediawiki', 'wiki', 'asciidoc', 'adoc', 'asc', 'pod']) {
+    for (const directory of ['', 'docs/', '.github/']) {
+      const path = directory + 'README.' + extension;
+      assert.equal(inspectTree(tree([path])).readme, true, path);
+      assert.equal(inspectTree(tree([path], true)).readme, true, path);
+    }
+  }
+  for (const path of ['README.png', 'README.adoc.backup', 'docs/guides/README.org', 'package/README.rdoc']) {
+    assert.equal(inspectTree(tree([path])).readme, false, path);
+    assert.equal(inspectTree(tree([path], true)).readme, null, path);
+  }
+});
+
+test('AsciiDoc overview prevents incorrect missing-README advice in collected reports', async () => {
+  const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/')
+    ? Response.json(tree(['docs/README.adoc', 'src/index.js'])) : undefined });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.repositories[0].checks.readme, true);
+  assert.ok(!report.recommendations.some(tip => tip.includes('add a README')));
+});
+
 test('documentation and data in test folders do not establish test code', () => {
   const paths = ['tests/README.md', 'test/example.json', 'spec/schema.yaml', '__tests__/image.png', 'specs/notes.txt'];
   assert.equal(inspectTree(tree(paths)).tests, false);
