@@ -286,7 +286,10 @@ Configure a token through your usual secret-management process if needed. No
 write access is required for this tool. Never put tokens in a command argument,
 README, report, or committed `.env` file. The CLI does not load `.env` files.
 
-Requests are sequential with a 15-second timeout. Detected rate limiting stops
+Requests are sequential with a 15-second timeout per request. For a slower connection,
+use `--timeout 45`; collection accepts whole seconds from 1 to 120. This is not a
+whole-run deadline and does not add retries. Offline modes reject the option.
+Detected rate limiting stops
 further requests and produces partial results if the profile and repo list are
 already available. Secondary-limit messages are recognized even when GitHub omits
 `Retry-After` and the primary quota is not exhausted. Ordinary permission errors

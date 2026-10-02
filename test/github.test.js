@@ -178,3 +178,15 @@ test('authentication failure during pagination preserves earlier pages and stops
   await assert.rejects(client.get('/repos/alice/other'), /remaining checks were skipped/);
   assert.equal(calls, 2);
 });
+
+test('configured timeout aborts an outstanding request and invalid durations are rejected', async () => {
+  for (const timeoutMs of [0, -1, 1.5, 120001, NaN, Infinity, '100']) {
+    assert.throws(() => new GitHubClient({ timeoutMs }), /timeoutMs/);
+  }
+  const client = new GitHubClient({ timeoutMs: 5, fetchImpl: async (url, { signal }) =>
+    new Promise((resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason), { once: true })) });
+  const keepAlive = setTimeout(() => {}, 1000);
+  try { await assert.rejects(client.get('/users/alice'), /Cannot reach GitHub/); }
+  finally { clearTimeout(keepAlive); }
+  assert.equal(client.requests, 1);
+});

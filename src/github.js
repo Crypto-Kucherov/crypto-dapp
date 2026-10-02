@@ -23,6 +23,9 @@ export function validateUsername(value) {
 
 export class GitHubClient {
   constructor({ token = '', fetchImpl = globalThis.fetch, timeoutMs = 15000 } = {}) {
+    if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 120000) {
+      throw new Error('timeoutMs must be an integer from 1 to 120000.');
+    }
     this.token = token.trim();
     this.fetchImpl = fetchImpl;
     this.timeoutMs = timeoutMs;

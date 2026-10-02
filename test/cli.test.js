@@ -143,3 +143,31 @@ test('a destination created during collection is still protected by the final wr
     assert.equal(await readFile(file, 'utf8'), 'another process wrote this');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('request timeout accepts bounded seconds only in collection mode', () => {
+  assert.equal(parseArgs(['alice']).timeoutSeconds, 15);
+  for (const seconds of ['1', '45', '120']) assert.equal(parseArgs(['alice', '--timeout', seconds]).timeoutSeconds, Number(seconds));
+  for (const value of ['0', '-1', '121', '1.5', 'Infinity', '1e2', 'ten']) {
+    assert.throws(() => parseArgs(['alice', '--timeout', value]), /--timeout/);
+  }
+  for (const args of [['alice', '--timeout'], ['alice', '--timeout', '1', '--timeout', '2'],
+    ['--from', 'a.json', '--timeout', '30'], ['--compare', 'a.json', 'b.json', '--timeout', '30']]) {
+    assert.throws(() => parseArgs(args), /--timeout/);
+  }
+});
+
+test('CLI uses the selected timeout for every request', async t => {
+  const milliseconds = [];
+  const original = AbortSignal.timeout;
+  t.mock.method(AbortSignal, 'timeout', value => {
+    milliseconds.push(value);
+    return original.call(AbortSignal, value);
+  });
+  t.mock.method(globalThis, 'fetch', publicClient().fetchImpl);
+  const { options, captured } = outputs();
+  delete options.client;
+  assert.equal(await main(['alice', '--timeout', '45', '--format', 'json'], options), 0);
+  assert.equal(JSON.parse(captured.stdout).profile.login, 'alice');
+  assert.equal(milliseconds.length, 5);
+  assert.ok(milliseconds.every(value => value === 45000));
+});
