@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, writeFile, mkdtemp, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdtemp, rm, open, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { main, parseArgs } from '../src/index.js';
-import { validateProfileReport } from '../src/snapshot.js';
+import { validateProfileReport, readSnapshot, MAX_SNAPSHOT_BYTES } from '../src/snapshot.js';
 
 const fixture = fileURLToPath(new URL('../examples/crypto-kucherov-after.json', import.meta.url));
 const example = JSON.parse(await readFile(fixture, 'utf8'));
@@ -154,5 +154,37 @@ test('UTF-8 BOM snapshots render and compare offline without changing saved text
     const invalid = capture();
     assert.equal(await main(['--from', file], invalid.options), 1);
     assert.doesNotMatch(invalid.output.stderr, /PRIVATE_MARKER/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('snapshot reads reject directories and oversized files before rendering', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bounded-snapshot-'));
+  try {
+    const huge = join(dir, 'huge.json');
+    const file = await open(huge, 'w');
+    try { await file.truncate(MAX_SNAPSHOT_BYTES + 1); } finally { await file.close(); }
+    for (const path of [dir, huge]) {
+      const { output, options } = capture();
+      assert.equal(await main(['--from', path], options), 1);
+      assert.equal(output.stdout, '');
+      assert.equal(output.calls, 0);
+      assert.match(output.stderr, path === dir ? /regular file/ : /20 MiB/);
+    }
+    await assert.rejects(readSnapshot(huge, 'Before snapshot'), /Before snapshot exceeds/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('snapshot size boundary and links to regular files remain readable', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'snapshot-boundary-'));
+  try {
+    const file = join(dir, 'exact-limit.json');
+    const data = Buffer.alloc(MAX_SNAPSHOT_BYTES, 32);
+    data.write('{"ok":true}');
+    await writeFile(file, data);
+    assert.deepEqual(await readSnapshot(file), { ok: true });
+    const linked = join(dir, 'linked.json');
+    await writeFile(file, JSON.stringify(example));
+    await symlink(file, linked);
+    assert.deepEqual(await readSnapshot(linked), example);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
