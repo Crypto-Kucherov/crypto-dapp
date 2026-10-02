@@ -100,6 +100,8 @@ the saved-data mode; stdout contains only the report.
 `--from` accepts `--format`, `--out` and `--fail-on-incomplete`, with Markdown as the default.
 It cannot be combined with a username, `--compare`, `--since`, `--until` or `--max-repos`.
 Invalid JSON, unsupported schemas and inconsistent coverage fail before rendering.
+UTF-8 JSON files saved with a leading byte order mark (BOM) are supported in both
+offline modes; characters inside saved values remain unchanged.
 Existing files, including the source snapshot, are never overwritten.
 
 ## Compare saved snapshots
