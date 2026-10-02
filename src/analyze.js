@@ -18,7 +18,7 @@ function isStableRelease(release) {
     || release.draft !== false || release.prerelease !== false || typeof release.html_url !== 'string') return false;
   try {
     const url = new URL(release.html_url);
-    return url.protocol === 'https:' && url.hostname === 'github.com' && !url.username && !url.password;
+    return url.origin === 'https://github.com' && !url.username && !url.password;
   } catch { return false; }
 }
 

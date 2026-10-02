@@ -8,7 +8,7 @@ export function escapeMarkdown(value) {
 export function link(label, url) {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'github.com' || parsed.username || parsed.password) {
+    if (parsed.origin !== 'https://github.com' || parsed.username || parsed.password) {
       return escapeMarkdown(label);
     }
     return `[${escapeMarkdown(label)}](${parsed.href.replace(/[()]/g, char => encodeURIComponent(char).replace('(', '%28').replace(')', '%29'))})`;

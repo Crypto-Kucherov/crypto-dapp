@@ -87,6 +87,7 @@ test('profile-controlled HTML and attribute payloads remain escaped text', () =>
 
 test('HTML permits only credential-free HTTPS GitHub links and escapes URL attributes', () => {
   for (const url of ['javascript:alert(1)', 'http://github.com/alice', '//github.com/alice',
+    'https://github.com:8443/alice', 'https://github.com:80/alice',
     'https://github.com.evil.example/alice', 'https://alice:secret@github.com/alice', 'not a URL']) {
     const report = profile();
     report.profile.url = url;
@@ -96,6 +97,8 @@ test('HTML permits only credential-free HTTPS GitHub links and escapes URL attri
   const report = profile();
   report.profile.url = 'https://github.com/Crypto-Kucherov?a=1&b="test"';
   assert.match(renderHtml(report), /href="https:\/\/github\.com\/Crypto-Kucherov\?a=1&amp;b=%22test%22" rel="noreferrer"/);
+  report.profile.url = 'https://GITHUB.com:443/alice';
+  assert.match(renderHtml(report).split('</header>')[0], /href="https:\/\/github\.com\/alice"/);
 });
 
 test('standalone pages carry a valid stylesheet CSP hash and no executable or remote assets', () => {

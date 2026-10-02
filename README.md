@@ -74,6 +74,9 @@ The HTML is a static view, not a live dashboard. Keep JSON snapshots for future
 comparisons; HTML files cannot be used as comparison inputs. Text from GitHub is
 escaped, links are restricted to HTTPS GitHub URLs, and an embedded content
 security policy blocks scripts and remote assets.
+Clickable links require the standard `https://github.com` origin without embedded
+credentials or a non-default port. An explicit port 443 is normalized and accepted.
+The same origin rule applies when accepting a release URL from the API.
 
 Download [the example profile HTML](examples/profile.html) or
 [the example comparison HTML](examples/comparison.html) and open it locally.
