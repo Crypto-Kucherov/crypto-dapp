@@ -113,19 +113,30 @@ export function compareSnapshots(before, after, { now = new Date() } = {}) {
   for (const key of ACTIVITY) metrics[key] = compareMetric(before.activity[key], after.activity[key], windowReason);
   for (const [key, value] of Object.entries(metrics)) if (!value.comparable) warnings.push(`${key}: ${value.reason}`);
   const oldRepos = new Map(before.repositories.map(repo => [repo.name.toLowerCase(), repo]));
-  const newRepos = new Map(after.repositories.map(repo => [repo.name.toLowerCase(), repo]));
-  const byId = repos => new Map(repos.filter(repo => repo.id !== undefined).map(repo => [repo.id, repo]));
-  const oldIds = byId(before.repositories), newIds = byId(after.repositories);
-  const find = (repo, names, ids) => ids.get(repo.id) || names.get(repo.name.toLowerCase());
-  const listedOnlyAfter = after.repositories.filter(repo => !find(repo, oldRepos, oldIds)).map(repo => ({
+  const oldIds = new Map(before.repositories.filter(repo => repo.id !== undefined).map(repo => [repo.id, repo]));
+  const matches = new Map();
+  const matchedOld = new Set();
+  const match = (repo, old) => { matches.set(repo, old); matchedOld.add(old); };
+  // Reserve every stable identity before falling back to names. Otherwise a
+  // replacement under an old name can borrow an already matched repo's history.
+  for (const repo of after.repositories) {
+    const old = oldIds.get(repo.id);
+    if (old) match(repo, old);
+  }
+  for (const repo of after.repositories) {
+    if (matches.has(repo)) continue;
+    const old = oldRepos.get(repo.name.toLowerCase());
+    if (old && !matchedOld.has(old)) match(repo, old);
+  }
+  const listedOnlyAfter = after.repositories.filter(repo => !matches.has(repo)).map(repo => ({
     name: repo.name, url: repo.url, absentFromOtherCompleteList: before.scope.repositoryListComplete,
   }));
-  const listedOnlyBefore = before.repositories.filter(repo => !find(repo, newRepos, newIds)).map(repo => ({
+  const listedOnlyBefore = before.repositories.filter(repo => !matchedOld.has(repo)).map(repo => ({
     name: repo.name, url: repo.url, absentFromOtherCompleteList: after.scope.repositoryListComplete,
   }));
   const compared = [];
   for (const repo of after.repositories) {
-    const old = find(repo, oldRepos, oldIds);
+    const old = matches.get(repo);
     if (!old || (!old.inspected && !repo.inspected)) continue;
     const result = { name: repo.name, url: repo.url, beforeInspected: old.inspected, afterInspected: repo.inspected };
     if (old.id !== undefined && repo.id !== undefined && old.id !== repo.id) {

@@ -361,7 +361,112 @@ test('ID matches take precedence when another repository reuses the old name', (
   const result = compareSnapshots(before, after);
   const compared = result.repositoryChanges.compared;
   assert.equal(compared.find(item => item.name === 'new-name').commits.delta, 0);
-  assert.match(compared.find(item => item.name === 'crypto-dapp').reason, /ID changed/);
+  assert.equal(compared.find(item => item.name === 'crypto-dapp'), undefined);
+  assert.deepEqual(result.repositoryChanges.listedOnlyAfter.map(item => item.name), ['crypto-dapp']);
+  assert.deepEqual(result.repositoryChanges.listedOnlyBefore, []);
+});
+
+function renamedWithLegacyReplacement() {
+  const { before, after } = pair();
+  const old = repo(before), renamed = repo(after);
+  old.id = renamed.id = 100;
+  renamed.name = 'new-name';
+  renamed.url = 'https://github.com/Crypto-Kucherov/new-name';
+  renamed.commits.count += 2;
+  const replacement = structuredClone(old);
+  delete replacement.id;
+  replacement.name = 'Crypto-Dapp';
+  replacement.commits.count = 999;
+  after.repositories.push(replacement);
+  after.profile.publicRepositories++;
+  after.scope.listedRepositories++;
+  after.scope.inspectedRepositories++;
+  return { before, after };
+}
+
+test('legacy name reuse cannot borrow a renamed repository history in either list order', () => {
+  for (const reverse of [false, true]) {
+    const { before, after } = renamedWithLegacyReplacement();
+    if (reverse) after.repositories.reverse();
+    const changes = compareSnapshots(before, after).repositoryChanges;
+    assert.equal(changes.compared.length, 1);
+    assert.equal(changes.compared[0].name, 'new-name');
+    assert.equal(changes.compared[0].commits.delta, 2);
+    assert.deepEqual(changes.listedOnlyAfter.map(item => item.name), ['Crypto-Dapp']);
+    assert.equal(changes.listedOnlyAfter[0].absentFromOtherCompleteList, true);
+    assert.deepEqual(changes.listedOnlyBefore, []);
+  }
+});
+
+test('a legacy repository displaced by a known rename stays visible in the older list', () => {
+  for (const complete of [true, false]) {
+    const { before, after } = renamedWithLegacyReplacement();
+    // Reverse the repository states while preserving chronological timestamps.
+    [before.repositories, after.repositories] = [after.repositories, before.repositories];
+    after.scope.repositoryListComplete = complete;
+    const changes = compareSnapshots(before, after).repositoryChanges;
+    assert.equal(changes.compared.length, 1);
+    assert.equal(changes.compared[0].previousName, 'new-name');
+    assert.equal(changes.compared[0].commits.delta, -2);
+    assert.deepEqual(changes.listedOnlyAfter, []);
+    assert.deepEqual(changes.listedOnlyBefore.map(item => item.name), ['Crypto-Dapp']);
+    assert.equal(changes.listedOnlyBefore[0].absentFromOtherCompleteList, complete);
+  }
+});
+
+test('two repositories swapping names retain their own histories regardless of order', () => {
+  for (const reverseBefore of [false, true]) for (const reverseAfter of [false, true]) {
+    const { before, after } = pair();
+    const old = repo(before);
+    old.id = 100;
+    before.repositories = [old, { ...structuredClone(old), id: 200, name: 'other', commits: { count: 40, complete: true } }];
+    after.repositories = [
+      { ...structuredClone(old), name: 'other', commits: { count: old.commits.count + 2, complete: true } },
+      { ...structuredClone(old), id: 200, commits: { count: 45, complete: true } },
+    ];
+    if (reverseBefore) before.repositories.reverse();
+    if (reverseAfter) after.repositories.reverse();
+    const changes = compareSnapshots(before, after).repositoryChanges;
+    assert.deepEqual(changes.listedOnlyAfter, []);
+    assert.deepEqual(changes.listedOnlyBefore, []);
+    assert.equal(changes.compared.length, 2);
+    assert.equal(changes.compared.find(item => item.name === 'other').commits.delta, 2);
+    assert.equal(changes.compared.find(item => item.name === 'crypto-dapp').commits.delta, 5);
+  }
+});
+
+test('uninspected ID matches still reserve identity before legacy name matching', () => {
+  const { before, after } = renamedWithLegacyReplacement();
+  repo(before).inspected = false;
+  after.repositories.find(item => item.name === 'new-name').inspected = false;
+  const changes = compareSnapshots(before, after).repositoryChanges;
+  assert.deepEqual(changes.compared, []);
+  assert.deepEqual(changes.listedOnlyBefore, []);
+  assert.deepEqual(changes.listedOnlyAfter.map(item => item.name), ['Crypto-Dapp']);
+});
+
+test('offline comparison exports do not attribute a replacement history to a renamed project', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'repo-identity-'));
+  try {
+    const { before, after } = renamedWithLegacyReplacement();
+    const older = join(dir, 'before.json'), newer = join(dir, 'after.json');
+    await writeFile(older, JSON.stringify(before));
+    await writeFile(newer, JSON.stringify(after));
+    for (const format of ['json', 'markdown', 'html']) {
+      const { text, options } = capture();
+      assert.equal(await main(['--compare', older, newer, '--format', format], options), 0);
+      if (format === 'json') {
+        const changes = JSON.parse(text.stdout).repositoryChanges;
+        assert.equal(changes.compared.length, 1);
+        assert.deepEqual(changes.listedOnlyAfter.map(item => item.name), ['Crypto-Dapp']);
+      } else {
+        assert.match(text.stdout, /Listed only after/);
+        assert.match(text.stdout, /Crypto-Dapp/);
+        assert.match(text.stdout, /\+2/);
+        assert.doesNotMatch(text.stdout, /999|\+996/);
+      }
+    }
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
 test('legacy snapshots without IDs still compare by name', () => {

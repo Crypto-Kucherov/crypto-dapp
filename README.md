@@ -166,6 +166,13 @@ New reports retain GitHub repository IDs. Older snapshots without IDs remain
 supported by matching names, but cannot distinguish a repository recreated under
 the same name. A present ID must be a positive safe integer and unique in its list.
 
+Each repository can match at most one repository in the other snapshot. All ID
+matches are reserved before falling back to names, regardless of list order or
+inspection status. If a repository is renamed and another takes its previous name,
+the replacement is listed only on its own side of the comparison; it cannot borrow
+the renamed project's commit history, even when the replacement has no saved ID.
+Visibility still describes what the snapshots list, not proof of creation or deletion.
+
 New profile exports also retain the numeric account ID from GitHub's public user
 response. GitHub describes this as a [durable ID independent of the login](https://docs.github.com/en/rest/users/users#get-a-user-using-their-id).
 Matching account IDs allow comparison after a username change, with a visible
