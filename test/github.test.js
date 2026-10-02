@@ -152,3 +152,29 @@ test('ordinary forbidden responses do not suppress unrelated later requests', as
     assert.equal(calls, 2);
   }
 });
+
+test('invalid credentials stop subsequent requests without exposing response text', async () => {
+  let calls = 0;
+  const client = new GitHubClient({ token: 'test-only', fetchImpl: async () => {
+    calls++;
+    return new Response('PRIVATE_MARKER', { status: 401 });
+  } });
+  await assert.rejects(client.get('/users/alice'), /rejected the token/);
+  await assert.rejects(client.get('/users/alice/repos'), error =>
+    error.status === 401 && /remaining checks were skipped/.test(error.message));
+  assert.equal(calls, 1);
+  assert.equal(client.requests, 1);
+});
+
+test('authentication failure during pagination preserves earlier pages and stops traffic', async () => {
+  let calls = 0;
+  const client = new GitHubClient({ fetchImpl: async () => ++calls === 1
+    ? Response.json([{ sha: 'saved' }], { headers: { link: '<https://api.github.com/next>; rel="next"' } })
+    : new Response('PRIVATE_MARKER', { status: 401 }) });
+  const result = await client.paginate('/repos/alice/tool/commits');
+  assert.deepEqual(result.items, [{ sha: 'saved' }]);
+  assert.equal(result.complete, false);
+  assert.doesNotMatch(result.warning, /PRIVATE_MARKER/);
+  await assert.rejects(client.get('/repos/alice/other'), /remaining checks were skipped/);
+  assert.equal(calls, 2);
+});

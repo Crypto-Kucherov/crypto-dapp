@@ -28,6 +28,7 @@ export class GitHubClient {
     this.timeoutMs = timeoutMs;
     this.requests = 0;
     this.rateLimited = false;
+    this.authenticationFailed = false;
   }
 
   async get(path) {
@@ -37,6 +38,9 @@ export class GitHubClient {
     }
     if (this.rateLimited) {
       throw new GitHubError('GitHub rate limit reached; remaining checks were skipped.', { rateLimited: true });
+    }
+    if (this.authenticationFailed) {
+      throw new GitHubError('GitHub rejected the token; remaining checks were skipped.', { status: 401 });
     }
     const headers = {
       Accept: 'application/vnd.github+json',
@@ -58,6 +62,7 @@ export class GitHubClient {
       throw new GitHubError('Cannot reach GitHub. Check your connection or retry after a timeout.');
     }
     if (!response.ok) {
+      if (response.status === 401) this.authenticationFailed = true;
       let apiMessage = '';
       if (response.status === 403 || response.status === 409) {
         try { apiMessage = (await response.json())?.message; } catch { /* Keep the generic HTTP error. */ }
