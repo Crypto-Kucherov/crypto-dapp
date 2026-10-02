@@ -61,7 +61,7 @@ export function inspectTree(tree, licenseMetadata = null) {
   const paths = tree.tree.filter(entry => entry.type === 'blob').map(entry => entry.path);
   const meaningful = paths.filter(path => !/(^|\/)(node_modules|vendor|dist|build|coverage|\.git)\//i.test(path));
   const exists = regex => meaningful.some(path => regex.test(path)) ? true : (tree.truncated ? null : false);
-  const readme = exists(/^(?:\.github\/|docs\/)?readme(?:\.(md|markdown|rst|txt))?$/i);
+  const readme = exists(/^(?:\.github\/|docs\/)?readme(?:\.(md|markdown|mdown|mkdn|rst|txt|textile|rdoc|org|creole|mediawiki|wiki|asciidoc|adoc|asc|pod))?$/i);
   const license = licenseMetadata?.spdx_id && licenseMetadata.spdx_id !== 'NOASSERTION'
     ? true : exists(/^(licen[cs]e|copying)(?:[.-][^/]+)?$/i);
   const tests = meaningful.some(isTestPath) ? true : (tree.truncated ? null : false);

@@ -190,6 +190,8 @@ node src/index.js --compare examples/crypto-kucherov.json examples/crypto-kucher
 - README, лицензия, тесты и GitHub Actions определяются по именам файлов.
   README ищется в корне, `.github/` и `docs/`: эти расположения поддерживает GitHub.
   README внутри вложенного пакета или руководства не заменяет README репозитория.
+  Помимо Markdown, распознаются AsciiDoc, Org, RDoc, Textile, reStructuredText,
+  Creole, MediaWiki и POD; список расширений есть в английском README.
   Наличие теста не означает, что он проходит; наличие workflow не означает успешный CI.
 - `Unknown` означает, что проверку не удалось завершить. Это не ноль и не отсутствие файла.
 - `incomplete` означает неполные данные; ограничения перечислены в отчёте.

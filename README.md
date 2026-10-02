@@ -247,6 +247,10 @@ workflow file does not prove successful CI. Nonstandard layouts may be missed.
 README detection checks the repository root, `.github/` and `docs/`, following
 [GitHub's documented overview locations](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes).
 A README nested inside a package or guide does not satisfy this overview check.
+Recognized extensions include Markdown (`md`, `markdown`, `mdown`, `mkdn`),
+`rst`, `txt`, `textile`, `rdoc`, `org`, `creole`, `mediawiki`, `wiki`,
+`asciidoc`, `adoc`, `asc` and `pod`, following [GitHub Markup's format list](https://github.com/github/markup#markups).
+Extensionless README files are also recognized. File contents are not rendered or validated.
 Source-file counting recognizes common languages and excludes common generated
 and dependency folders; documentation-only projects can legitimately have no code.
 Recommendations are portfolio suggestions, not a quality rating or Legion policy.
