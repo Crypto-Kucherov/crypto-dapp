@@ -3,6 +3,7 @@ import { GitHubError, validateUsername } from './github.js';
 const DAY = 86400000;
 const UNKNOWN_CHECKS = { readme: null, license: null, tests: null, ci: null, sourceFiles: null };
 const SOURCE_EXTENSION = /\.(?:[cm]?[jt]sx?|py|rs|go|sol|vy|java|kt|swift|c|h|cc|hh|cpp|hpp|cxx|hxx|cs|rb|php|ex|exs|sh|vue|svelte)$/i;
+const IGNORED_DIRECTORY = /(^|\/)(?:node_modules|vendor|dist|build|coverage|\.git|\.venv|venv|\.tox|\.nox|__pycache__|__pypackages__|\.pytest_cache|\.mypy_cache|\.next|\.nuxt|\.svelte-kit|\.yarn)\//i;
 
 function isTreeResponse(tree) {
   return tree !== null && typeof tree === 'object' && Array.isArray(tree.tree)
@@ -60,7 +61,7 @@ export function parseUntil(value, now) {
 export function inspectTree(tree, licenseMetadata = null) {
   if (!isTreeResponse(tree)) return { ...UNKNOWN_CHECKS };
   const paths = tree.tree.filter(entry => entry.type === 'blob').map(entry => entry.path);
-  const meaningful = paths.filter(path => !/(^|\/)(node_modules|vendor|dist|build|coverage|\.git)\//i.test(path));
+  const meaningful = paths.filter(path => !IGNORED_DIRECTORY.test(path));
   const exists = regex => meaningful.some(path => regex.test(path)) ? true : (tree.truncated ? null : false);
   const readme = exists(/^(?:\.github\/|docs\/)?readme(?:\.(md|markdown|mdown|mkdn|rst|txt|textile|rdoc|org|creole|mediawiki|wiki|asciidoc|adoc|asc|pod))?$/i);
   const license = licenseMetadata?.spdx_id && licenseMetadata.spdx_id !== 'NOASSERTION'
