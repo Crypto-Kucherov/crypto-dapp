@@ -255,6 +255,13 @@ Source-file counting recognizes common languages and excludes common generated
 and dependency folders; documentation-only projects can legitimately have no code.
 Recommendations are portfolio suggestions, not a quality rating or Legion policy.
 
+Source and test detection excludes files beneath `node_modules`, `vendor`, `dist`,
+`build`, `coverage`, `.git`, `.venv`, `venv`, `.tox`, `.nox`, `__pycache__`,
+`__pypackages__`, `.pytest_cache`, `.mypy_cache`, `.next`, `.nuxt`,
+`.svelte-kit` and `.yarn` directories at any depth. These exact directory names
+are heuristics for dependencies or generated output; similarly named source files
+such as `venv_manager.py` remain included.
+
 ### Recognized test paths
 
 Only files with a recognized source-code extension can establish test-path evidence.

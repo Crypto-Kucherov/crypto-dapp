@@ -119,6 +119,29 @@ test('tree checks skip vendored code and distinguish truncated absence', () => {
   assert.equal(inspectTree(null).readme, null);
 });
 
+test('virtual environments and framework caches do not establish project source or tests', () => {
+  for (const directory of ['.venv', 'venv', '.tox', '.nox', '__pycache__', '__pypackages__',
+    '.pytest_cache', '.mypy_cache', '.next', '.nuxt', '.svelte-kit', '.yarn']) {
+    const paths = [directory + '/tests/test_library.py', 'apps/site/' + directory + '/src/index.ts'];
+    const result = inspectTree(tree(paths));
+    assert.equal(result.sourceFiles, 0, directory);
+    assert.equal(result.tests, false, directory);
+    assert.equal(inspectTree(tree(paths, true)).tests, null, directory);
+  }
+  const own = inspectTree(tree(['src/venv_manager.py', 'src/next/index.ts', 'src/environment/test_parser.py']));
+  assert.equal(own.sourceFiles, 3);
+  assert.equal(own.tests, true);
+});
+
+test('dependency tests in a virtual environment do not hide missing project tests', async () => {
+  const { client } = fixtureClient({ override: url => url.pathname.includes('/git/trees/')
+    ? Response.json(tree(['README.md', 'src/app.py', '.venv/lib/library/tests/test_library.py'])) : undefined });
+  const report = await analyzeProfile(client, 'alice', { now: NOW });
+  assert.equal(report.repositories[0].checks.sourceFiles, 1);
+  assert.equal(report.repositories[0].checks.tests, false);
+  assert.ok(report.recommendations.some(tip => tip.includes('add tests')));
+});
+
 test('supports Go, colocated JS tests and Python test files', () => {
   for (const path of ['pkg/main_test.go', 'src/index.test.mjs', 'src/button.spec.tsx', 'test_parser.py']) assert.equal(inspectTree(tree([path])).tests, true, path);
 });
