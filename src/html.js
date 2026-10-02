@@ -8,7 +8,7 @@ const escape = value => String(value ?? '').replace(/[&<>"']/g, char => ({
 function link(label, url) {
   try {
     const parsed = new URL(url);
-    if (parsed.protocol === 'https:' && parsed.hostname === 'github.com' && !parsed.username && !parsed.password) {
+    if (parsed.origin === 'https://github.com' && !parsed.username && !parsed.password) {
       return `<a href="${escape(parsed.href)}" rel="noreferrer">${escape(label)}</a>`;
     }
   } catch { /* Invalid URLs remain plain text. */ }

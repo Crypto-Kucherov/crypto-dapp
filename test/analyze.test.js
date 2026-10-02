@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { GitHubClient } from '../src/github.js';
 import { analyzeProfile, inspectTree, parseSince, parseUntil } from '../src/analyze.js';
-import { renderMarkdown } from '../src/report.js';
+import { renderMarkdown, link } from '../src/report.js';
 import { validateProfileReport } from '../src/snapshot.js';
 
 const NOW = new Date('2026-09-27T12:00:00.000Z');
@@ -334,7 +334,8 @@ test('empty complete trees and valid non-file entries remain supported', () => {
 test('malformed or non-stable latest-release responses remain unknown with a warning', async () => {
   const stable = { tag_name: 'v1.0.0', html_url: 'https://github.com/alice/tool/releases/tag/v1.0.0', draft: false, prerelease: false };
   for (const data of [null, {}, { ...stable, tag_name: '' }, { ...stable, draft: true },
-    { ...stable, prerelease: true }, { ...stable, html_url: 'javascript:PRIVATE_MARKER' }]) {
+    { ...stable, prerelease: true }, { ...stable, html_url: 'javascript:PRIVATE_MARKER' },
+    { ...stable, html_url: 'https://github.com:8443/alice/tool/releases/tag/v1.0.0' }]) {
     const { client } = fixtureClient({ override: url => url.pathname.endsWith('/releases/latest') ? Response.json(data) : undefined });
     const report = await analyzeProfile(client, 'alice', { now: NOW });
     assert.equal(report.repositories[0].release.status, 'unknown');
@@ -345,6 +346,12 @@ test('malformed or non-stable latest-release responses remain unknown with a war
   const { client } = fixtureClient({ override: url => url.pathname.endsWith('/releases/latest') ? Response.json(stable) : undefined });
   const report = await analyzeProfile(client, 'alice', { now: NOW });
   assert.deepEqual(report.repositories[0].release, { status: 'present', tag: stable.tag_name, url: stable.html_url });
+});
+
+test('Markdown links require the standard GitHub HTTPS origin', () => {
+  for (const url of ['https://github.com:8443/alice', 'https://github.com:80/alice',
+    'http://github.com/alice', 'https://secret@github.com/alice']) assert.equal(link('Alice', url), 'Alice');
+  assert.equal(link('Alice', 'https://GITHUB.com:443/alice'), '[Alice](https://github.com/alice)');
 });
 
 test('a truncated tree does not produce false missing-file advice', async () => {
