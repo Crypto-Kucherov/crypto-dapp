@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.0 — 2026-10-02
+
+### Usability
+
+- Generate JSON, Markdown and standalone HTML reports manually in GitHub Actions.
+- Infer the export format from the output filename, with explicit `--format` taking precedence.
+- Configure per-request timeouts with `--timeout` (1–120 seconds).
+- Read UTF-8 snapshots with a leading BOM in both offline modes.
+
+### Reliability
+
+- Reject non-file snapshot inputs and bound reads to 20 MiB, including files that grow while read.
+- Stop API traffic after rejected credentials while preserving previously collected evidence.
+- Show numeric Retry-After guidance before primary-rate-limit reset times.
+- Retain account IDs to distinguish reused logins and support account renames.
+- Reserve repository ID matches before names so replacement projects cannot reuse another project's history.
+- Recognize additional GitHub README markup formats and C/C++ source/test paths.
+- Exclude Python virtual environments and common framework caches from source and test evidence.
+- Require the standard GitHub HTTPS origin for rendered links and API release URLs.
+
+Schema version 1 remains supported, including older snapshots without IDs. Name
+fallbacks cannot establish identity after an unrecorded rename or name reuse.
+File checks remain heuristics, and no report predicts Legion Score.
+
 ## 0.6.0 — 2026-09-30
 
 - Distinguish explicit empty-repository responses from generic conflicts, preserving unknown evidence when emptiness is unconfirmed.

@@ -171,3 +171,39 @@ test('CLI uses the selected timeout for every request', async t => {
   assert.equal(milliseconds.length, 5);
   assert.ok(milliseconds.every(value => value === 45000));
 });
+
+test('output extensions select formats in every mode unless explicitly overridden', () => {
+  for (const mode of [['alice'], ['--from', 'saved.json'], ['--compare', 'a.json', 'b.json']]) {
+    for (const [path, expected] of [['report.json', 'json'], ['report.JSON', 'json'],
+      ['report.html', 'html'], ['report.HTM', 'html'], ['report.md', 'markdown'],
+      ['report', 'markdown'], ['report.json.txt', 'markdown'], ['.json', 'markdown']]) {
+      assert.equal(parseArgs([...mode, '--out', path]).format, expected, path);
+      assert.equal(parseArgs([...mode, '--out', path, '--format', 'markdown']).format, 'markdown');
+      assert.equal(parseArgs([...mode, '--format', 'json', '--out', path]).format, 'json');
+    }
+    assert.equal(parseArgs(mode).format, 'markdown');
+  }
+  assert.throws(() => parseArgs(['alice', '--out', 'report.json', '--format', 'yaml']), /--format/);
+});
+
+test('inferred exports collect JSON once and render HTML and comparisons offline', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'inferred-format-'));
+  try {
+    const saved = join(dir, 'profile.JSON'), html = join(dir, 'profile.HTML'), comparison = join(dir, 'comparison.json');
+    const live = outputs();
+    assert.equal(await main(['alice', '--out', saved], live.options), 0);
+    assert.equal(JSON.parse(await readFile(saved, 'utf8')).profile.login, 'alice');
+    assert.equal(live.options.client.requests, 5);
+    const offline = outputs();
+    assert.equal(await main(['--from', saved, '--out', html], offline.options), 0);
+    assert.match(await readFile(html, 'utf8'), /^<!doctype html>/);
+    assert.equal(await main(['--compare', saved, saved, '--out', comparison], offline.options), 0);
+    const changes = JSON.parse(await readFile(comparison, 'utf8'));
+    assert.equal(changes.kind, 'comparison');
+    assert.equal(changes.metrics.publicRepositories.delta, 0);
+    assert.equal(offline.options.client.requests, 0);
+    const override = join(dir, 'explicit.json');
+    assert.equal(await main(['--from', saved, '--out', override, '--format', 'markdown'], offline.options), 0);
+    assert.match(await readFile(override, 'utf8'), /^# GitHub activity report/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
